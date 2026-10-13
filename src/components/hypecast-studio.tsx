@@ -18,7 +18,7 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
-import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { demoBrief, demoClips, demoCreators, demoReels, demoReferences } from "@/lib/demo-data";
@@ -72,8 +72,9 @@ function StudioAuthBoundary({ children }: { children: React.ReactNode }) {
   const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   if (!clerkEnabled) return children;
   return (
-    <>
-      <SignedOut>
+    <Show
+      when="signed-in"
+      fallback={
         <div className="auth-screen">
           <div className="auth-card">
             <div className="brand-mark">H</div>
@@ -87,9 +88,10 @@ function StudioAuthBoundary({ children }: { children: React.ReactNode }) {
             </SignInButton>
           </div>
         </div>
-      </SignedOut>
-      <SignedIn>{children}</SignedIn>
-    </>
+      }
+    >
+      {children}
+    </Show>
   );
 }
 
