@@ -1,0 +1,61 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+
+export default defineSchema({
+  projects: defineTable({
+    ownerTokenIdentifier: v.string(),
+    clientProjectId: v.string(),
+    productName: v.optional(v.string()),
+    productUrl: v.optional(v.string()),
+    stage: v.number(),
+    snapshot: v.any(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["ownerTokenIdentifier"])
+    .index("by_owner_and_client_id", ["ownerTokenIdentifier", "clientProjectId"]),
+
+  assets: defineTable({
+    ownerTokenIdentifier: v.string(),
+    projectId: v.id("projects"),
+    clientAssetId: v.string(),
+    kind: v.union(v.literal("candidate"), v.literal("reference"), v.literal("clip"), v.literal("export")),
+    provider: v.string(),
+    url: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")),
+    metadata: v.any(),
+    createdAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_and_client_id", ["projectId", "clientAssetId"]),
+
+  generationJobs: defineTable({
+    ownerTokenIdentifier: v.string(),
+    projectId: v.id("projects"),
+    provider: v.string(),
+    providerRequestId: v.string(),
+    kind: v.union(v.literal("image"), v.literal("video"), v.literal("text")),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("generating"),
+      v.literal("ready"),
+      v.literal("failed"),
+    ),
+    resultUrl: v.optional(v.string()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_provider_request", ["provider", "providerRequestId"]),
+
+  reels: defineTable({
+    ownerTokenIdentifier: v.string(),
+    projectId: v.id("projects"),
+    clientReelId: v.string(),
+    clipId: v.string(),
+    editState: v.any(),
+    exportedUrl: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index("by_project", ["projectId"]),
+});
