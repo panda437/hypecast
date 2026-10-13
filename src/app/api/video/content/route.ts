@@ -1,6 +1,8 @@
 import { requireGenerationAccess, routeError } from "@/lib/server-auth";
+import { connection } from "next/server";
 
 export async function GET(request: Request) {
+  await connection();
   try {
     await requireGenerationAccess();
     if (!process.env.OPENROUTER_API_KEY) throw new Error("OpenRouter is not configured.");
