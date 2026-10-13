@@ -92,27 +92,20 @@ export const demoCreators: CreatorCandidate[] = creatorSeed.map((entry, index) =
 export function demoReferences(creator: CreatorCandidate): ReferenceImage[] {
   const index = demoCreators.findIndex((item) => item.id === creator.id);
   return [
-    { id: "ref-front", label: "Character anchor", direction: "Front-facing medium portrait", imageDataUrl: portrait(creator.name, index, 0), status: "ready" },
-    { id: "ref-laptop", label: "Work mode", direction: "Three-quarter view at a laptop", imageDataUrl: portrait(creator.name, index, 1), status: "ready" },
-    { id: "ref-phone", label: "Phone moment", direction: "Casual phone-in-hand lifestyle shot", imageDataUrl: portrait(creator.name, index, -1), status: "ready" },
+    { id: "ref-anchor", label: "First-run portrait", direction: "The selected creator image becomes the reusable 17-second still background", imageDataUrl: portrait(creator.name, index, 0), status: "ready" },
   ];
 }
 
 export function demoClips(references: ReferenceImage[]): VideoClip[] {
-  const motions = [
-    ["Deep work", "Types naturally, pauses, reads the screen, soft handheld drift"],
-    ["The notification", "Checks a phone, subtle eyebrow raise, returns to work"],
-    ["Between meetings", "Walks slowly through warm daylight, glances toward camera"],
-  ];
-  return motions.map(([label, motionPrompt], index) => ({
-    id: `clip-${index + 1}`,
-    label,
-    motionPrompt,
-    referenceImageId: references[index].id,
-    provider: "demo",
+  return [{
+    id: "clip-still",
+    label: "Creator portrait · 17s",
+    motionPrompt: "A gentle local push-in gives the still subtle motion without a video-generation call",
+    referenceImageId: references[0].id,
+    provider: "still",
     status: "ready",
-    posterUrl: references[index].imageDataUrl,
-  }));
+    posterUrl: references[0].imageDataUrl,
+  }];
 }
 
 export function demoReels(clips: VideoClip[]): Reel[] {
@@ -121,7 +114,7 @@ export function demoReels(clips: VideoClip[]): Reel[] {
     title: `Reel ${String(index + 1).padStart(2, "0")}`,
     clipId: clips[index % clips.length].id,
     hook,
-    cards: [{ id: `card-${index + 1}`, text: hook, start: 0, end: 15 }],
+    cards: [{ id: `card-${index + 1}`, text: hook, start: 0, end: 17 }],
     position: index % 3 === 0 ? "top" : index % 3 === 1 ? "center" : "bottom",
     style: index % 3 === 0 ? "glass" : index % 3 === 1 ? "clean" : "highlight",
   }));

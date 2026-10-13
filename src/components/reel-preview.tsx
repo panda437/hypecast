@@ -16,7 +16,7 @@ export function ReelPreview({ reel, clip, compact = false }: ReelPreviewProps) {
   useEffect(() => {
     if (clip?.videoUrl) return;
     const started = performance.now();
-    const timer = window.setInterval(() => setTime(((performance.now() - started) / 1000) % 15), 120);
+    const timer = window.setInterval(() => setTime(((performance.now() - started) / 1000) % 17), 120);
     return () => window.clearInterval(timer);
   }, [clip?.videoUrl]);
 
@@ -42,7 +42,7 @@ export function ReelPreview({ reel, clip, compact = false }: ReelPreviewProps) {
         ) : clip?.posterUrl ? (
           // Generated image data is dynamic and intentionally bypasses Next image optimization.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={clip.posterUrl} alt="Creator motion mock" className="reel-poster" />
+          <img src={clip.posterUrl} alt="Creator still background" className="reel-poster" />
         ) : (
           <div className="reel-empty">
             <span>9:16</span>
@@ -58,7 +58,7 @@ export function ReelPreview({ reel, clip, compact = false }: ReelPreviewProps) {
         </div>
       ) : null}
       <div className="reel-brand">HYPECAST / SILENT CUT</div>
-      <div className="reel-time">{Math.floor(time).toString().padStart(2, "0")}:15</div>
+      <div className="reel-time">{Math.floor(time).toString().padStart(2, "0")}:17</div>
     </div>
   );
 }

@@ -2,7 +2,7 @@ import type { Reel, VideoClip } from "@/lib/types";
 
 const WIDTH = 720;
 const HEIGHT = 1280;
-const DURATION = 15;
+const DURATION = 17;
 
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
   ctx.beginPath();

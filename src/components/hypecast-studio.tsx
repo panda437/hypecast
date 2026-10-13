@@ -28,21 +28,20 @@ import type {
   CreatorCandidate,
   ProductBrief,
   Reel,
-  ReferenceImage,
   VideoClip,
   WorkspaceSnapshot,
 } from "@/lib/types";
 import { ReelPreview } from "@/components/reel-preview";
 import { CloudProjectSync } from "@/components/cloud-project-sync";
 
-const STORAGE_KEY = "hypecast-project-v1";
+const STORAGE_KEY = "hypecast-project-v2";
 
 const steps = [
   ["Brief", "Know the product"],
   ["Persona", "Approve the angle"],
   ["Cast", "Choose one creator"],
-  ["References", "Lock the look"],
-  ["Clips", "Generate motion"],
+  ["Portrait", "Lock the still"],
+  ["Background", "Reuse at $0"],
   ["Reels", "Edit and export"],
 ];
 
@@ -56,12 +55,6 @@ const emptyWorkspace: WorkspaceSnapshot = {
   reels: [],
   updatedAt: Date.now(),
 };
-
-const motionDirections = [
-  ["Deep work", "The creator types naturally at a laptop, pauses to read the screen, then makes a tiny satisfied nod. Subtle handheld camera drift, realistic breathing and blinking, quiet candid energy. No speaking, no lip movement, no text, no camera morphing."],
-  ["The notification", "The creator checks a phone, scrolls once, gives a restrained eyebrow raise, and sets it beside the laptop. Natural hand movement, soft window light, subtle handheld camera. No speaking, no lip movement, no text."],
-  ["Between meetings", "The creator walks slowly through a simple daylight interior, pauses near a window, then glances toward camera. Calm candid movement, stable facial identity, phone-camera realism. No speaking, no lip movement, no text."],
-];
 
 function pause(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -104,7 +97,6 @@ export function HypecastStudio() {
   const [workspace, setWorkspace] = useState<WorkspaceSnapshot>(emptyWorkspace);
   const [hydrated, setHydrated] = useState(false);
   const [capabilities, setCapabilities] = useState<(AppCapabilities & { openrouter?: boolean }) | null>(null);
-  const [videoEstimate, setVideoEstimate] = useState<number | null>(null);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [selectedReelId, setSelectedReelId] = useState("");
@@ -122,9 +114,6 @@ export function HypecastStudio() {
     }, 0);
     apiRequest<AppCapabilities & { openrouter?: boolean }>("/api/health")
       .then(setCapabilities)
-      .catch(() => null);
-    apiRequest<{ models: Array<{ estimatedBatchUsd: number }> }>("/api/video/models")
-      .then(({ models }) => setVideoEstimate(models[0]?.estimatedBatchUsd ?? null))
       .catch(() => null);
     return () => window.clearTimeout(hydrateTimer);
   }, []);
@@ -288,137 +277,49 @@ export function HypecastStudio() {
     updateWorkspace({ selectedCreatorId: id });
   }
 
-  async function createReferences() {
+  function lockPortrait() {
     if (!selectedCreator?.imageDataUrl) {
       setError("Choose a creator with a finished portrait first.");
       return;
     }
-    setBusy("references");
     setError("");
-    if (workspace.mode === "demo") {
-      await pause(550);
-      updateWorkspace({ references: demoReferences(selectedCreator), step: 3 });
-      setBusy("");
-      return;
-    }
-    const definitions: ReferenceImage[] = [
-      { id: "ref-front", label: "Character anchor", direction: "Front-facing medium portrait, relaxed shoulders, direct natural eye contact", status: "generating" },
-      { id: "ref-laptop", label: "Work mode", direction: "Three-quarter view seated at a laptop, hands visible, focused but relaxed expression", status: "generating" },
-      { id: "ref-phone", label: "Phone moment", direction: "Standing casually with a phone in one hand, looking at the screen with subtle curiosity", status: "generating" },
-    ];
-    updateWorkspace({ references: definitions, step: 3 });
-    await Promise.allSettled(
-      definitions.map(async (reference) => {
-        try {
-          const { imageDataUrl } = await apiRequest<{ imageDataUrl: string }>("/api/image", {
-            kind: "reference",
-            name: selectedCreator.name,
-            characterBible: selectedCreator.characterBible,
-            direction: reference.direction,
-            sourceDataUrl: selectedCreator.imageDataUrl,
-          });
-          setWorkspace((current) => ({
-            ...current,
-            references: current.references.map((item) =>
-              item.id === reference.id ? { ...item, imageDataUrl, status: "ready" } : item,
-            ),
-          }));
-        } catch {
-          setWorkspace((current) => ({
-            ...current,
-            references: current.references.map((item) =>
-              item.id === reference.id ? { ...item, status: "failed" } : item,
-            ),
-          }));
-        }
-      }),
-    );
-    setBusy("");
+    const references = workspace.mode === "demo"
+      ? demoReferences(selectedCreator)
+      : [{
+          id: "ref-anchor",
+          label: "First-run portrait",
+          direction: "The approved creator image becomes the reusable 17-second still background.",
+          imageDataUrl: selectedCreator.imageDataUrl,
+          status: "ready" as const,
+        }];
+    updateWorkspace({ references, step: 3 });
   }
 
-  async function pollClip(clipId: string, requestId: string) {
-    for (let attempt = 0; attempt < 90; attempt += 1) {
-      await pause(attempt === 0 ? 2_000 : 10_000);
-      const job = await apiRequest<{
-        status: VideoClip["status"];
-        videoUrl?: string;
-        error?: string;
-      }>("/api/video/status", { requestId });
-      setWorkspace((current) => ({
-        ...current,
-        clips: current.clips.map((clip) =>
-          clip.id === clipId ? { ...clip, status: job.status, videoUrl: job.videoUrl, error: job.error } : clip,
-        ),
-      }));
-      if (job.status === "ready" || job.status === "failed") return;
-    }
-    setWorkspace((current) => ({
-      ...current,
-      clips: current.clips.map((clip) =>
-        clip.id === clipId ? { ...clip, status: "failed", error: "Timed out while waiting for the provider." } : clip,
-      ),
-    }));
-  }
-
-  async function generateClips() {
-    if (workspace.references.some((reference) => reference.status !== "ready" || !reference.imageDataUrl)) {
-      setError("All three reference images must be ready before video generation.");
+  function prepareStillBackground() {
+    const reference = workspace.references[0];
+    if (!reference?.imageDataUrl || reference.status !== "ready") {
+      setError("Approve the creator portrait first.");
       return;
     }
-    setBusy("clips");
     setError("");
-    const clips: VideoClip[] = motionDirections.map(([label, motionPrompt], index) => ({
-      id: `clip-${index + 1}`,
-      label,
-      motionPrompt,
-      referenceImageId: workspace.references[index].id,
-      provider: workspace.mode === "demo" ? "demo" : capabilities?.videoProvider === "fal.ai" ? "fal" : "openrouter",
-      status: workspace.mode === "demo" ? "ready" : "idle",
-      posterUrl: workspace.references[index].imageDataUrl,
-    }));
-    if (workspace.mode === "demo") {
-      await pause(800);
-      updateWorkspace({ clips: demoClips(workspace.references), step: 4 });
-      setBusy("");
-      return;
-    }
-    if (!capabilities?.openrouter && !capabilities?.fal) {
-      setError("Video generation is wired, but this environment still needs an OpenRouter API key.");
-      setBusy("");
-      return;
-    }
+    const clips = workspace.mode === "demo"
+      ? demoClips(workspace.references)
+      : [{
+          id: "clip-still",
+          label: "Creator portrait · 17s",
+          motionPrompt: "A gentle local push-in gives the still subtle motion without a video-generation call.",
+          referenceImageId: reference.id,
+          provider: "still" as const,
+          status: "ready" as const,
+          posterUrl: reference.imageDataUrl,
+        }];
     updateWorkspace({ clips, step: 4 });
-    const referenceUrls = workspace.references.map((reference) => reference.imageDataUrl as string);
-    try {
-      const jobs: Array<Promise<void>> = [];
-      for (const clip of clips) {
-        const reference = workspace.references.find((item) => item.id === clip.referenceImageId);
-        if (!reference?.imageDataUrl) continue;
-        const result = await apiRequest<{ requestId: string; status: VideoClip["status"] }>("/api/video/submit", {
-          prompt: clip.motionPrompt,
-          startImageUrl: reference.imageDataUrl,
-          referenceImageUrls: referenceUrls,
-        });
-        setWorkspace((current) => ({
-          ...current,
-          clips: current.clips.map((item) =>
-            item.id === clip.id ? { ...item, requestId: result.requestId, status: result.status } : item,
-          ),
-        }));
-        jobs.push(pollClip(clip.id, result.requestId));
-      }
-      setBusy("");
-      await Promise.allSettled(jobs);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The video provider could not start this batch.");
-      setBusy("");
-    }
   }
 
   async function buildReels() {
     const readyClips = workspace.clips.filter((clip) => clip.status === "ready");
-    if (readyClips.length < 3 || !workspace.brief) {
-      setError("Wait until all three clips are genuinely ready.");
+    if (readyClips.length < 1 || !workspace.brief) {
+      setError("Approve the still background before writing reels.");
       return;
     }
     setBusy("reels");
@@ -439,8 +340,8 @@ export function HypecastStudio() {
           clipId: readyClips[index % readyClips.length].id,
           hook: item.hook,
           cards: [
-            { id: `card-${index + 1}-a`, text: item.hook, start: 0, end: 7.5 },
-            { id: `card-${index + 1}-b`, text: item.followUp, start: 7.5, end: 15 },
+            { id: `card-${index + 1}-a`, text: item.hook, start: 0, end: 8.5 },
+            { id: `card-${index + 1}-b`, text: item.followUp, start: 8.5, end: 17 },
           ],
           position: index % 3 === 0 ? "top" : index % 3 === 1 ? "center" : "bottom",
           style: index % 3 === 0 ? "glass" : index % 3 === 1 ? "clean" : "highlight",
@@ -475,13 +376,13 @@ export function HypecastStudio() {
 
   function addTextCard(reel: Reel) {
     if (reel.cards.length >= 3) return;
-    const start = reel.cards.length === 1 ? 7.5 : 10;
+    const start = reel.cards.length === 1 ? 8.5 : 11.5;
     const cards = reel.cards.length === 1
-      ? [{ ...reel.cards[0], end: 7.5 }, { id: `${reel.id}-card-2`, text: "Add the next beat…", start, end: 15 }]
-      : [...reel.cards, { id: `${reel.id}-card-3`, text: "Finish the story…", start: 10, end: 15 }];
+      ? [{ ...reel.cards[0], end: 8.5 }, { id: `${reel.id}-card-2`, text: "Add the next beat…", start, end: 17 }]
+      : [...reel.cards, { id: `${reel.id}-card-3`, text: "Finish the story…", start: 11.5, end: 17 }];
     if (cards.length === 3) {
-      cards[0] = { ...cards[0], end: 5 };
-      cards[1] = { ...cards[1], start: 5, end: 10 };
+      cards[0] = { ...cards[0], end: 5.5 };
+      cards[1] = { ...cards[1], start: 5.5, end: 11.5 };
     }
     updateReel(reel.id, { cards });
   }
@@ -508,7 +409,7 @@ export function HypecastStudio() {
           title: "Preview",
           clipId: activeClip?.id || "",
           hook: workspace.brief.hookAngles[0] || workspace.brief.oneLiner,
-          cards: [{ id: "preview-card", text: workspace.brief.hookAngles[0] || workspace.brief.oneLiner, start: 0, end: 15 }],
+          cards: [{ id: "preview-card", text: workspace.brief.hookAngles[0] || workspace.brief.oneLiner, start: 0, end: 17 }],
           position: "center",
           style: "glass",
         } satisfies Reel)
@@ -568,7 +469,7 @@ export function HypecastStudio() {
                 <div className="intro-view">
                   <span className="eyebrow">ONE LINK → ONE CREATOR → FIVE REELS</span>
                   <h1>Make your product<br /><em>impossible to scroll past.</em></h1>
-                  <p className="intro-copy">Hypecast reads your product, casts a consistent AI creator, and turns three silent background clips into five editable vertical reels.</p>
+                  <p className="intro-copy">Hypecast reads your product, casts an AI creator, and turns one approved portrait into five editable 17-second vertical reels—without paying for video generation.</p>
                   <form className="url-form" onSubmit={analyzeProduct}>
                     <label htmlFor="product-url">Your public product URL</label>
                     <div className="url-input-wrap">
@@ -588,13 +489,13 @@ export function HypecastStudio() {
                   </form>
                   <div className="demo-row">
                     <button className="text-button" onClick={startDemo}><Play size={15} /> Try the zero-credit demo</button>
-                    <span>No generation calls. Export uses motion mocks.</span>
+                    <span>No generation calls. Export adds a subtle local push-in.</span>
                   </div>
                   <div className="promise-grid">
                     <div><strong>05</strong><span>editable reels</span></div>
-                    <div><strong>03</strong><span>background clips</span></div>
-                    <div><strong>15s</strong><span>silent & vertical</span></div>
-                    <div><strong>{videoEstimate === null ? "≈$0.90" : `≈$${videoEstimate.toFixed(2)}`}</strong><span>validation video batch</span></div>
+                    <div><strong>01</strong><span>reusable portrait</span></div>
+                    <div><strong>17s</strong><span>silent & vertical</span></div>
+                    <div><strong>$0</strong><span>video spend</span></div>
                   </div>
                 </div>
               ) : null}
@@ -620,7 +521,7 @@ export function HypecastStudio() {
 
               {workspace.step === 2 ? (
                 <div className="stage-view">
-                  <StageHeader number="02" eyebrow="CREATOR CAST" title="Pick the face of the account." description="One creator becomes the continuity anchor for every reference, clip, and future batch." />
+                  <StageHeader number="02" eyebrow="CREATOR CAST" title="Pick the face of the account." description="The selected portrait becomes the first reusable background and the identity anchor for future library clips." />
                   <div className="creator-grid">
                     {workspace.creators.map((creator) => (
                       <button key={creator.id} className={`creator-card ${workspace.selectedCreatorId === creator.id ? "is-selected" : ""}`} onClick={() => creator.imageStatus === "ready" && chooseCreator(creator.id)} disabled={creator.imageStatus !== "ready"}>
@@ -632,14 +533,14 @@ export function HypecastStudio() {
                       </button>
                     ))}
                   </div>
-                  <div className="stage-actions"><button className="button button--primary" onClick={createReferences} disabled={!selectedCreator || busy === "references"}>{busy === "references" ? <LoaderCircle className="spin" size={17} /> : <ImageIcon size={17} />} Lock creator & build references</button><small>Regenerate individual references later without recasting.</small></div>
+                  <div className="stage-actions"><button className="button button--primary" onClick={lockPortrait} disabled={!selectedCreator}><ImageIcon size={17} /> Lock this portrait</button><small>No extra reference-image generation in the first run.</small></div>
                 </div>
               ) : null}
 
               {workspace.step === 3 ? (
                 <div className="stage-view">
-                  <StageHeader number="03" eyebrow="IDENTITY REFERENCES" title="Three angles. One recognizable human." description="These images keep the face, styling, and mood stable when motion generation begins." />
-                  <div className="reference-grid">
+                  <StageHeader number="03" eyebrow="FIRST-RUN PORTRAIT" title="One image. Five chances to win." description="The first batch reuses this exact portrait. Hypecast adds only a gentle local camera move during export, so video-generation spend stays at zero." />
+                  <div className="reference-grid reference-grid--single">
                     {workspace.references.map((reference, index) => (
                       <article className="reference-card" key={reference.id}>
                         <div className="reference-image">{reference.imageDataUrl ? <img src={reference.imageDataUrl} alt={reference.label} /> : <div className="loading-tile"><LoaderCircle className={reference.status === "generating" ? "spin" : ""} /><span>{reference.status === "failed" ? "Generation failed" : "Generating reference"}</span></div>}<span className="reference-number">0{index + 1}</span></div>
@@ -647,24 +548,24 @@ export function HypecastStudio() {
                       </article>
                     ))}
                   </div>
-                  <div className="quality-callout"><Check size={17} /><div><strong>Continuity check</strong><p>Approve only if face shape, hair, age, wardrobe palette, and skin tone read as the same person.</p></div></div>
-                  <div className="stage-actions"><button className="button button--primary" onClick={generateClips} disabled={workspace.references.some((reference) => reference.status !== "ready") || busy === "clips"}>{busy === "clips" ? <LoaderCircle className="spin" size={17} /> : <Clapperboard size={17} />} Generate three 15s clips</button><small>{workspace.mode === "demo" ? "Creates labelled motion mocks." : `Economy estimate: ${videoEstimate === null ? "~$0.90" : `~$${videoEstimate.toFixed(2)}`} before retries.`}</small></div>
+                  <div className="quality-callout"><Check size={17} /><div><strong>Budget check</strong><p>This portrait is already paid for. Reusing it across five hooks tests the content idea before spending anything on motion.</p></div></div>
+                  <div className="stage-actions"><button className="button button--primary" onClick={prepareStillBackground} disabled={workspace.references.some((reference) => reference.status !== "ready")}><Clapperboard size={17} /> Build the $0 background</button><small>Creates a 17-second still-based background locally.</small></div>
                 </div>
               ) : null}
 
               {workspace.step === 4 ? (
                 <div className="stage-view">
-                  <StageHeader number="04" eyebrow="BACKGROUND CLIPS" title="Motion that leaves room for the words." description="Silent, simple actions keep the creator believable without competing with the hook." />
+                  <StageHeader number="04" eyebrow="BACKGROUND LIBRARY" title="Start with the image you already have." description="This portrait is the first reusable library asset. In run two, optional AI video generations can be added here once and reused across future reels." />
                   <div className="clip-list">
                     {workspace.clips.map((clip, index) => (
                       <article className="clip-row" key={clip.id}>
                         <div className="clip-thumb">{clip.videoUrl ? <video src={clip.videoUrl} muted loop autoPlay playsInline /> : clip.posterUrl ? <img src={clip.posterUrl} alt="" /> : null}<span>0{index + 1}</span></div>
-                        <div className="clip-copy"><span>{clip.label}</span><h3>{clip.motionPrompt.split(".")[0]}</h3><p>{clip.provider === "demo" ? "Motion mock — no AI video claim" : `${clip.provider} · 9:16 · 15 seconds · audio off`}</p>{clip.error ? <small className="error-copy">{clip.error}</small> : null}</div>
+                        <div className="clip-copy"><span>{clip.label}</span><h3>{clip.motionPrompt.split(".")[0]}</h3><p>{clip.provider === "still" ? "Still-based · 9:16 · 17 seconds · $0 video generation" : `${clip.provider} library asset · audio off`}</p>{clip.error ? <small className="error-copy">{clip.error}</small> : null}</div>
                         <div className={`job-status job-status--${clip.status}`}>{clip.status === "queued" || clip.status === "generating" ? <LoaderCircle className="spin" size={15} /> : clip.status === "ready" ? <Check size={15} /> : <CircleAlert size={15} />} {statusLabel(clip.status)}</div>
                       </article>
                     ))}
                   </div>
-                  <div className="stage-actions"><button className="button button--primary" onClick={buildReels} disabled={workspace.clips.filter((clip) => clip.status === "ready").length < 3 || busy === "reels"}>{busy === "reels" ? <LoaderCircle className="spin" size={17} /> : <Film size={17} />} Write five reels</button><small>Only available after all three assets are playable.</small></div>
+                  <div className="stage-actions"><button className="button button--primary" onClick={buildReels} disabled={workspace.clips.filter((clip) => clip.status === "ready").length < 1 || busy === "reels"}>{busy === "reels" ? <LoaderCircle className="spin" size={17} /> : <Film size={17} />} Write five reels</button><small>The same asset can support many hook tests.</small></div>
                 </div>
               ) : null}
 
@@ -678,8 +579,8 @@ export function HypecastStudio() {
                       <div className="text-card-editor" key={card.id}>
                         <span className="card-index">0{index + 1}</span>
                         <textarea value={card.text} onChange={(event) => updateCard(selectedReel.id, card.id, { text: event.target.value })} rows={2} />
-                        <label>FROM<input type="number" min="0" max="15" step="0.5" value={card.start} onChange={(event) => updateCard(selectedReel.id, card.id, { start: Number(event.target.value) })} /></label>
-                        <label>TO<input type="number" min="0" max="15" step="0.5" value={card.end} onChange={(event) => updateCard(selectedReel.id, card.id, { end: Number(event.target.value) })} /></label>
+                        <label>FROM<input type="number" min="0" max="17" step="0.5" value={card.start} onChange={(event) => updateCard(selectedReel.id, card.id, { start: Number(event.target.value) })} /></label>
+                        <label>TO<input type="number" min="0" max="17" step="0.5" value={card.end} onChange={(event) => updateCard(selectedReel.id, card.id, { end: Number(event.target.value) })} /></label>
                       </div>
                     ))}
                     <button className="text-button" onClick={() => addTextCard(selectedReel)} disabled={selectedReel.cards.length >= 3}><Plus size={15} /> Add timed text change</button>
@@ -689,13 +590,13 @@ export function HypecastStudio() {
                       <label><span>Text treatment</span><select value={selectedReel.style} onChange={(event) => updateReel(selectedReel.id, { style: event.target.value as Reel["style"] })}><option value="glass">Smoked glass</option><option value="clean">Clean outline</option><option value="highlight">Hype orange</option></select></label>
                     </div>
                   </div>
-                  <div className="stage-actions"><button className="button button--primary" onClick={() => exportOne(selectedReel)} disabled={Boolean(exportProgress[selectedReel.id] && exportProgress[selectedReel.id] < 100)}>{exportProgress[selectedReel.id] && exportProgress[selectedReel.id] < 100 ? <LoaderCircle className="spin" size={17} /> : <Download size={17} />} {exportProgress[selectedReel.id] && exportProgress[selectedReel.id] < 100 ? `Encoding ${exportProgress[selectedReel.id]}%` : "Export MP4"}</button><small>{workspace.mode === "demo" ? "Demo exports are labelled motion mocks built from stills." : "Silent H.264 MP4, text burned in."}</small></div>
+                  <div className="stage-actions"><button className="button button--primary" onClick={() => exportOne(selectedReel)} disabled={Boolean(exportProgress[selectedReel.id] && exportProgress[selectedReel.id] < 100)}>{exportProgress[selectedReel.id] && exportProgress[selectedReel.id] < 100 ? <LoaderCircle className="spin" size={17} /> : <Download size={17} />} {exportProgress[selectedReel.id] && exportProgress[selectedReel.id] < 100 ? `Encoding ${exportProgress[selectedReel.id]}%` : "Export MP4"}</button><small>17-second silent H.264 MP4 with a local push-in and burned-in text.</small></div>
                 </div>
               ) : null}
             </section>
 
             <aside className="preview-panel">
-              <div className="preview-head"><div><span>LIVE PREVIEW</span><strong>Sound off by design</strong></div><span className="format-chip">9:16 · 15s</span></div>
+              <div className="preview-head"><div><span>LIVE PREVIEW</span><strong>Sound off by design</strong></div><span className="format-chip">9:16 · 17s</span></div>
               <ReelPreview reel={previewReel} clip={activeClip} />
               <div className="preview-meta">
                 <div><span>CREATOR</span><strong>{selectedCreator?.name || "Not cast yet"}</strong></div>
@@ -704,7 +605,8 @@ export function HypecastStudio() {
               <div className="system-status">
                 <span className="section-label">SYSTEM CHECK</span>
                 <div><span>OpenAI</span><strong className={capabilities?.openai ? "ok" : "muted"}>{capabilities?.openai ? "Ready" : "Missing"}</strong></div>
-                <div><span>Video</span><strong className={capabilities?.openrouter || capabilities?.fal ? "ok" : "muted"}>{capabilities?.openrouter ? "OpenRouter" : capabilities?.fal ? "fal.ai" : "Demo only"}</strong></div>
+                <div><span>First-run video</span><strong className="ok">$0 still mode</strong></div>
+                <div><span>Motion library</span><strong className={capabilities?.openrouter || capabilities?.fal ? "ok" : "muted"}>{capabilities?.openrouter ? "OpenRouter optional" : capabilities?.fal ? "fal.ai optional" : "Add in run two"}</strong></div>
                 <div><span>Database</span><strong className={capabilities?.convex ? "ok" : "muted"}>{capabilities?.convex ? "Convex ready" : "Local only"}</strong></div>
                 <div><span>Login</span><strong className={capabilities?.clerk ? "ok" : "muted"}>{capabilities?.clerk ? "Protected" : "Not connected"}</strong></div>
               </div>

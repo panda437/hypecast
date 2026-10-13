@@ -10,12 +10,12 @@ describe("the zero-credit Hypecast flow", () => {
     const clips = demoClips(references);
     const reels = demoReels(clips);
 
-    expect(references).toHaveLength(3);
+    expect(references).toHaveLength(1);
     expect(references.every((reference) => reference.status === "ready")).toBe(true);
-    expect(clips).toHaveLength(3);
-    expect(clips.every((clip) => clip.provider === "demo" && clip.status === "ready")).toBe(true);
+    expect(clips).toHaveLength(1);
+    expect(clips.every((clip) => clip.provider === "still" && clip.status === "ready")).toBe(true);
     expect(reels).toHaveLength(5);
     expect(reels.every((reel) => clips.some((clip) => clip.id === reel.clipId))).toBe(true);
-    expect(reels.every((reel) => reel.cards.every((card) => card.start >= 0 && card.end <= 15))).toBe(true);
+    expect(reels.every((reel) => reel.cards.every((card) => card.start >= 0 && card.end <= 17))).toBe(true);
   });
 });
