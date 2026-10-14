@@ -68,34 +68,8 @@ function statusLabel(status: VideoClip["status"]) {
   return "Not started";
 }
 
-function StudioAuthBoundary({ children }: { children: React.ReactNode }) {
-  const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-  if (!clerkEnabled) return children;
-  return (
-    <Show
-      when="signed-in"
-      fallback={
-        <div className="auth-screen">
-          <div className="auth-card">
-            <div className="brand-mark">H</div>
-            <span className="eyebrow">HYPECAST STUDIO</span>
-            <h1>Your creator account starts with one link.</h1>
-            <p>Sign in to keep expensive generations private and resume your reel batch later.</p>
-            <SignInButton mode="modal">
-              <button className="button button--primary button--wide">
-                <LogIn size={17} /> Sign in to build
-              </button>
-            </SignInButton>
-          </div>
-        </div>
-      }
-    >
-      {children}
-    </Show>
-  );
-}
-
 export function HypecastStudio() {
+  const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   const [workspace, setWorkspace] = useState<WorkspaceSnapshot>(emptyWorkspace);
   const [hydrated, setHydrated] = useState(false);
   const [capabilities, setCapabilities] = useState<(AppCapabilities & { openrouter?: boolean }) | null>(null);
@@ -418,7 +392,7 @@ export function HypecastStudio() {
       : undefined);
 
   return (
-    <StudioAuthBoundary>
+    <>
       {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL ? (
         <CloudProjectSync workspace={workspace} onAssetStored={handleAssetStored} />
       ) : null}
@@ -457,7 +431,18 @@ export function HypecastStudio() {
             <div className="crumbs"><span>Hypecast</span><ChevronRight size={14} /><strong>{workspace.brief?.productName || "New project"}</strong></div>
             <div className="topbar-actions">
               <span className="status-pill"><span className="signal signal--live" /> Autosaved</span>
-              {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? <UserButton /> : <span className="status-pill">Local demo session</span>}
+              {clerkEnabled ? (
+                <Show
+                  when="signed-in"
+                  fallback={
+                    <SignInButton mode="modal">
+                      <button className="button button--small"><LogIn size={14} /> Sign in</button>
+                    </SignInButton>
+                  }
+                >
+                  <UserButton />
+                </Show>
+              ) : <span className="status-pill">Local demo session</span>}
             </div>
           </header>
 
@@ -483,10 +468,28 @@ export function HypecastStudio() {
                         onChange={(event) => updateWorkspace({ productUrl: event.target.value })}
                         required
                       />
-                      <button className="button button--primary" disabled={busy === "analyzing"}>
-                        {busy === "analyzing" ? <LoaderCircle className="spin" size={17} /> : <WandSparkles size={17} />}
-                        Build my brief
-                      </button>
+                      {clerkEnabled ? (
+                        <Show
+                          when="signed-in"
+                          fallback={
+                            <SignInButton mode="modal">
+                              <button type="button" className="button button--primary">
+                                <LogIn size={17} /> Sign in to build
+                              </button>
+                            </SignInButton>
+                          }
+                        >
+                          <button className="button button--primary" disabled={busy === "analyzing"}>
+                            {busy === "analyzing" ? <LoaderCircle className="spin" size={17} /> : <WandSparkles size={17} />}
+                            Build my brief
+                          </button>
+                        </Show>
+                      ) : (
+                        <button className="button button--primary" disabled={busy === "analyzing"}>
+                          {busy === "analyzing" ? <LoaderCircle className="spin" size={17} /> : <WandSparkles size={17} />}
+                          Build my brief
+                        </button>
+                      )}
                     </div>
                   </form>
                   <div className="demo-row">
@@ -616,7 +619,7 @@ export function HypecastStudio() {
           </div>
         </main>
       </div>
-    </StudioAuthBoundary>
+    </>
   );
 }
 
