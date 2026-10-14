@@ -6,10 +6,14 @@ export function buildInstagramBio(
   productUrl: string,
 ) {
   const firstName = creator.name.trim().split(/\s+/)[0] || "Creator";
+  const identity = creator.archetype
+    .trim()
+    .replace(/^the\s+/i, "")
+    .toLowerCase();
   const productName = brief?.productName.trim();
   const link = productUrl.trim() || brief?.source.url.trim() || "";
   return [
-    `${firstName} · AI creator`,
+    `${firstName} · ${identity || "small moments & honest lessons"}`,
     "small moments, honest lessons & things I noticed late",
     productName ? `currently using ${productName} ↓` : "what I am using lately ↓",
     link,

@@ -5,7 +5,8 @@ import { buildInstagramBio, instagramProfileFilename, squareProfileCrop } from "
 describe("Instagram profile kit", () => {
   it("keeps the cast personal and puts the product link last", () => {
     const bio = buildInstagramBio(demoCreators[0], demoBrief, "https://mosaic.example");
-    expect(bio).toContain("Maya · AI creator");
+    expect(bio).toContain("Maya · observant operator");
+    expect(bio).not.toMatch(/\b(ai|virtual)\b/i);
     expect(bio).toContain("currently using Mosaic");
     expect(bio.split("\n").at(-1)).toBe("https://mosaic.example");
   });
