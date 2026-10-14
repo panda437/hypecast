@@ -9,6 +9,7 @@ import {
   Clock3,
   Cloud,
   Download,
+  FileArchive,
   FileVideo,
   ImageIcon,
   LayoutGrid,
@@ -27,8 +28,9 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { demoClips, demoCreators, demoCreatorsForBrief, demoReels, demoReferences } from "@/lib/demo-data";
 import { DEFAULT_MOTION_RECIPE, MOTION_RECIPES } from "@/lib/motion-recipes";
-import { exportReel } from "@/lib/reel-export";
+import { downloadBlob, exportReel, reelFilename } from "@/lib/reel-export";
 import { composeVideoPrompt } from "@/lib/video-prompt";
+import { InstagramPublisher } from "@/components/instagram-publisher";
 import type {
   AppCapabilities,
   CreatorCandidate,
@@ -37,6 +39,7 @@ import type {
   Reel,
   ReferenceImage,
   SavedProject,
+  SaveStatus,
   StoryBatch,
   VideoClip,
   WorkspaceSnapshot,
@@ -44,8 +47,10 @@ import type {
 import { ReelPreview } from "@/components/reel-preview";
 import { CloudProjectSync } from "@/components/cloud-project-sync";
 
-const STORAGE_KEY = "hypecast-project-v2";
-const PROJECTS_STORAGE_KEY = "hypecast-project-history-v1";
+const STORAGE_KEY = "cueface-project-v1";
+const PROJECTS_STORAGE_KEY = "cueface-project-history-v1";
+const LEGACY_STORAGE_KEY = "hypecast-project-v2";
+const LEGACY_PROJECTS_STORAGE_KEY = "hypecast-project-history-v1";
 const REEL_DURATION = 15;
 const onboardingSteps = ["Read link", "Review direction", "Choose cast"];
 
@@ -71,6 +76,7 @@ const emptyWorkspace: WorkspaceSnapshot = {
   clips: [],
   reels: [],
   storyBatches: [],
+  activeReelId: undefined,
   exports: [],
   updatedAt: Date.now(),
 };
@@ -184,6 +190,7 @@ function normalizeWorkspace(saved: WorkspaceSnapshot): WorkspaceSnapshot {
     reels,
     storyBatches: batches,
     activeBatchId: saved.activeBatchId || batches.at(-1)?.id,
+    activeReelId: reels.some((reel) => reel.id === saved.activeReelId) ? saved.activeReelId : reels[0]?.id,
     activeCastId: saved.activeCastId || (step === 3 ? saved.selectedCreatorId : undefined),
     exports: Array.isArray(saved.exports) ? saved.exports : [],
     step,
@@ -191,7 +198,7 @@ function normalizeWorkspace(saved: WorkspaceSnapshot): WorkspaceSnapshot {
   };
 }
 
-export function HypecastStudio() {
+export function CueFaceStudio() {
   const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   const [workspace, setWorkspace] = useState<WorkspaceSnapshot>(emptyWorkspace);
   const [demoStarted, setDemoStarted] = useState(false);
@@ -203,6 +210,9 @@ export function HypecastStudio() {
   const [selectedReelId, setSelectedReelId] = useState("");
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [exportProgress, setExportProgress] = useState<Record<string, number>>({});
+  const [bulkExportProgress, setBulkExportProgress] = useState<{ current: number; total: number; percent: number } | null>(null);
+  const [deviceSaveStatus, setDeviceSaveStatus] = useState<SaveStatus>({ state: "idle", target: "device" });
+  const [cloudSaveStatus, setCloudSaveStatus] = useState<SaveStatus>({ state: "idle", target: "cloud" });
   const [deviceProjects, setDeviceProjects] = useState<SavedProject[]>([]);
   const [cloudProjects, setCloudProjects] = useState<SavedProject[]>([]);
   const [pendingExports, setPendingExports] = useState<PendingExport[]>([]);
@@ -215,13 +225,15 @@ export function HypecastStudio() {
   useEffect(() => {
     const hydrateTimer = window.setTimeout(() => {
       try {
-        const saved = window.localStorage.getItem(STORAGE_KEY);
+        const saved = window.localStorage.getItem(STORAGE_KEY) || window.localStorage.getItem(LEGACY_STORAGE_KEY);
         if (saved) {
-          setWorkspace(normalizeWorkspace(JSON.parse(saved) as WorkspaceSnapshot));
+          const restored = normalizeWorkspace(JSON.parse(saved) as WorkspaceSnapshot);
+          setWorkspace(restored);
+          setSelectedReelId(restored.activeReelId || restored.reels[0]?.id || "");
         } else {
           setWorkspace(newWorkspace(clerkEnabled ? "live" : "demo"));
         }
-        const history = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
+        const history = window.localStorage.getItem(PROJECTS_STORAGE_KEY) || window.localStorage.getItem(LEGACY_PROJECTS_STORAGE_KEY);
         if (history) {
           const snapshots = JSON.parse(history) as WorkspaceSnapshot[];
           setDeviceProjects(snapshots.map((snapshot) => {
@@ -238,6 +250,8 @@ export function HypecastStudio() {
       } catch {
         window.localStorage.removeItem(STORAGE_KEY);
         window.localStorage.removeItem(PROJECTS_STORAGE_KEY);
+        window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+        window.localStorage.removeItem(LEGACY_PROJECTS_STORAGE_KEY);
         setWorkspace(newWorkspace(clerkEnabled ? "live" : "demo"));
       }
       setHydrated(true);
@@ -253,11 +267,15 @@ export function HypecastStudio() {
 
   useEffect(() => {
     if (!hydrated || !workspace.clientProjectId) return;
+    const savingTimer = window.setTimeout(() => setDeviceSaveStatus({ state: "saving", target: "device" }), 0);
     const timer = window.setTimeout(() => {
       try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
+        window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+        setDeviceSaveStatus({ state: "saved", target: "device", savedAt: Date.now() });
       } catch {
         // Large live images are moved to Convex; the cloud copy remains authoritative.
+        setDeviceSaveStatus({ state: "error", target: "device", message: "Device save failed" });
       }
       setDeviceProjects((current) => {
         const saved: SavedProject = {
@@ -272,13 +290,17 @@ export function HypecastStudio() {
           .slice(0, 20);
         try {
           window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(next.map((project) => project.snapshot)));
+          window.localStorage.removeItem(LEGACY_PROJECTS_STORAGE_KEY);
         } catch {
           // Keep the in-memory history while cloud storage replaces inline media.
         }
         return next;
       });
     }, 250);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(savingTimer);
+      window.clearTimeout(timer);
+    };
   }, [hydrated, workspace]);
 
   useEffect(() => {
@@ -394,13 +416,17 @@ export function HypecastStudio() {
   const restoreWorkspace = useCallback((saved: WorkspaceSnapshot) => {
     const restored = normalizeWorkspace(saved);
     setWorkspace(restored);
-    setSelectedReelId(restored.reels[0]?.id || "");
+    setSelectedReelId(restored.activeReelId || restored.reels[0]?.id || "");
     setSelectedAssetId(restored.clips[0]?.id || "");
     setError("");
   }, []);
 
   const handleCloudProjects = useCallback((projects: SavedProject[]) => {
     setCloudProjects(projects);
+  }, []);
+
+  const handleCloudSaveStatus = useCallback((status: SaveStatus) => {
+    setCloudSaveStatus(status);
   }, []);
 
   function openSavedProject(clientProjectId: string) {
@@ -426,7 +452,7 @@ export function HypecastStudio() {
     try {
       const endpoint = workspace.mode === "demo" ? "/api/demo/analyze" : "/api/analyze";
       const { brief } = await apiRequest<{ brief: ProductBrief }>(endpoint, { url: workspace.productUrl });
-      updateWorkspace({ brief, step: 1, creators: [], selectedCreatorId: undefined, activeCastId: undefined, references: [], clips: [], reels: [], storyBatches: [], activeBatchId: undefined, exports: [] });
+      updateWorkspace({ brief, step: 1, creators: [], selectedCreatorId: undefined, activeCastId: undefined, references: [], clips: [], reels: [], storyBatches: [], activeBatchId: undefined, activeReelId: undefined, exports: [] });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not analyze that page.");
     } finally {
@@ -449,6 +475,7 @@ export function HypecastStudio() {
       reels: [],
       storyBatches: [],
       activeBatchId: undefined,
+      activeReelId: undefined,
       exports: [],
     });
     setSelectedReelId("");
@@ -553,6 +580,7 @@ export function HypecastStudio() {
         reels,
         storyBatches: [batch],
         activeBatchId: batch.id,
+        activeReelId: reels[0].id,
         exports: [],
         step: 3,
         updatedAt: Date.now(),
@@ -737,6 +765,7 @@ export function HypecastStudio() {
         reels,
         storyBatches: [...current.storyBatches, batch],
         activeBatchId: batch.id,
+        activeReelId: reels[0].id,
         step: 3,
         updatedAt: Date.now(),
       }));
@@ -772,11 +801,16 @@ export function HypecastStudio() {
     if (selectedReel) updateReel(selectedReel.id, { clipId });
   }
 
+  function chooseReel(reelId: string) {
+    setSelectedReelId(reelId);
+    updateWorkspace({ activeReelId: reelId });
+  }
+
   function chooseBatch(batchId: string) {
     const batch = workspace.storyBatches.find((item) => item.id === batchId);
     if (!batch) return;
     const reels = cloneReels(batch.reels);
-    updateWorkspace({ activeBatchId: batchId, reels });
+    updateWorkspace({ activeBatchId: batchId, activeReelId: reels[0]?.id, reels });
     setSelectedReelId(reels[0]?.id || "");
   }
 
@@ -799,6 +833,46 @@ export function HypecastStudio() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "This browser could not export the reel.");
       setExportProgress((current) => ({ ...current, [reel.id]: 0 }));
+    }
+  }
+
+  async function exportAll() {
+    if (!workspace.reels.length || bulkExportProgress) return;
+    setError("");
+    setBulkExportProgress({ current: 1, total: workspace.reels.length, percent: 0 });
+    try {
+      const { downloadZip } = await import("client-zip");
+      const rendered: Array<{ name: string; input: Blob; lastModified: number }> = [];
+      const records: PendingExport[] = [];
+      const exportRecords: WorkspaceSnapshot["exports"] = [];
+      for (let index = 0; index < workspace.reels.length; index += 1) {
+        const reel = workspace.reels[index];
+        const clip = workspace.clips.find((item) => item.id === reel.clipId);
+        if (!clip) throw new Error(`Reel ${index + 1} has no ready background.`);
+        const blob = await exportReel(reel, clip, (progress) => {
+          setExportProgress((current) => ({ ...current, [reel.id]: progress }));
+          setBulkExportProgress({
+            current: index + 1,
+            total: workspace.reels.length,
+            percent: Math.round(((index + progress / 100) / workspace.reels.length) * 100),
+          });
+        }, { download: false });
+        const createdAt = Date.now();
+        const id = newId("export");
+        const story = reel.cards[0]?.text || reel.hook;
+        rendered.push({ name: reelFilename(reel, index), input: blob, lastModified: createdAt });
+        records.push({ id, clientProjectId: workspace.clientProjectId, blob, reelId: reel.id, title: reel.title, story, createdAt });
+        exportRecords.push({ id, reelId: reel.id, title: reel.title, story, clipId: reel.clipId, createdAt, status: "downloaded" });
+      }
+      const zip = await downloadZip(rendered).blob();
+      const projectName = (workspace.brief?.productName || "project").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      downloadBlob(zip, `cueface-${projectName || "project"}-five-reels.zip`);
+      setWorkspace((current) => ({ ...current, exports: [...exportRecords, ...current.exports], updatedAt: Date.now() }));
+      setPendingExports((current) => [...current, ...records]);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "This browser could not export all five reels.");
+    } finally {
+      setBulkExportProgress(null);
     }
   }
 
@@ -831,6 +905,9 @@ export function HypecastStudio() {
       busy={busy}
       error={error}
       exportProgress={exportProgress}
+      bulkExportProgress={bulkExportProgress}
+      deviceSaveStatus={deviceSaveStatus}
+      cloudSaveStatus={cloudSaveStatus}
       capabilities={capabilities}
       videoPlan={videoPlan}
       savedProjects={savedProjects}
@@ -838,7 +915,7 @@ export function HypecastStudio() {
       onReset={resetProject}
       onChangeCast={() => updateWorkspace({ step: 2 })}
       onOpenProject={openSavedProject}
-      onSelectReel={setSelectedReelId}
+      onSelectReel={chooseReel}
       onSelectAsset={chooseAsset}
       onUpdateStory={updateStory}
       onUpdateReel={updateReel}
@@ -847,6 +924,7 @@ export function HypecastStudio() {
       onGenerateImage={generateCastImage}
       onGenerateVideo={generateCastVideo}
       onExport={exportOne}
+      onExportAll={exportAll}
     />
   ) : (
     <CastOnboarding
@@ -879,6 +957,7 @@ export function HypecastStudio() {
           onExportStored={handleExportStored}
           onRestore={restoreWorkspace}
           onProjectsChanged={handleCloudProjects}
+          onSaveStatus={handleCloudSaveStatus}
         />
       ) : null}
       {clerkEnabled ? (
@@ -901,7 +980,7 @@ function MarketingHome({ clerkEnabled, onStartDemo }: { clerkEnabled: boolean; o
   return (
     <div className="hypecast-home">
       <header className="home-nav">
-        <div className="brand"><span className="brand-mark">H</span><span>HYPECAST</span></div>
+        <div className="brand"><span className="brand-mark">C</span><span>CUEFACE</span></div>
         <nav><a href="#how-it-works">How it works</a><a href="#story-format">Story format</a></nav>
         <div className="home-nav-actions">{clerkEnabled ? <SignInButton mode="modal"><button className="home-login">Log in</button></SignInButton> : null}{studioButton}</div>
       </header>
@@ -911,11 +990,11 @@ function MarketingHome({ clerkEnabled, onStartDemo }: { clerkEnabled: boolean; o
           <div className="home-hero-copy">
             <span className="eyebrow">AI CREATOR STUDIO · BUILD WEEK MVP</span>
             <h1>Give your product<br />a cast worth <em>following.</em></h1>
-            <p>Hypecast turns one product link into a consistent creator and five story-led reels. The free demo reads your real page, lets you choose the face, and builds the first still-image reel.</p>
+            <p>CueFace turns one product link into a consistent creator and five story-led reels. The free demo reads your real page, lets you choose the face, and builds the first still-image reel.</p>
             <div className="home-hero-actions">{studioButton}<button className="text-button" onClick={onStartDemo}><Play size={15} /> Try the zero-credit demo</button></div>
             <div className="home-proofline"><span>01 approved cast</span><span>05 editable stories</span><span>15s silent reels</span><span>$0 video generation</span></div>
           </div>
-          <div className="home-product-shot" aria-label="Hypecast studio preview">
+          <div className="home-product-shot" aria-label="CueFace studio preview">
             <div className="home-shot-top"><span>CAST / MAYA</span><strong>Story 01</strong><small>15 SEC</small></div>
             <div className="home-shot-body">
               <div className="home-shot-assets"><span>CAST LIBRARY</span>{demoCreators.slice(0, 3).map((creator, index) => <img key={creator.id} src={creator.imageDataUrl} alt="" className={index === 0 ? "is-active" : ""} />)}</div>
@@ -928,7 +1007,7 @@ function MarketingHome({ clerkEnabled, onStartDemo }: { clerkEnabled: boolean; o
         <section className="home-thesis" id="how-it-works">
           <div><span className="eyebrow">THE CAST STAYS. THE STORIES CHANGE.</span><h2>Not another prompt box.<br />A repeatable creator workflow.</h2></div>
           <div className="home-steps">
-            <article><span>01</span><h3>Paste the real link</h3><p>Hypecast reads the public page and shows you exactly what it extracted before anything is created.</p></article>
+            <article><span>01</span><h3>Paste the real link</h3><p>CueFace reads the public page and shows you exactly what it extracted before anything is created.</p></article>
             <article><span>02</span><h3>Choose the cast</h3><p>Review five distinct creator candidates. The one you approve becomes the identity anchor for the account.</p></article>
             <article><span>03</span><h3>Get the first reel</h3><p>The selected portrait becomes a 15-second still reel with editable text, ready to preview and export.</p></article>
           </div>
@@ -951,7 +1030,7 @@ function MarketingHome({ clerkEnabled, onStartDemo }: { clerkEnabled: boolean; o
           {studioButton}
         </section>
       </main>
-      <footer className="home-footer"><div className="brand"><span className="brand-mark">H</span><span>HYPECAST</span></div><span>GrowthX Build Week MVP</span></footer>
+      <footer className="home-footer"><div className="brand"><span className="brand-mark">C</span><span>CUEFACE</span></div><span>GrowthX Build Week MVP</span></footer>
     </div>
   );
 }
@@ -979,7 +1058,7 @@ function CastOnboarding(props: OnboardingProps) {
   return (
     <div className="onboarding-shell">
       <header className="studio-topbar">
-        <button className="brand" onClick={props.onReset}><span className="brand-mark">H</span><span>HYPECAST</span></button>
+        <button className="brand" onClick={props.onReset}><span className="brand-mark">C</span><span>CUEFACE</span></button>
         <div className="studio-topbar-title"><span>CREATOR ONBOARDING</span><strong>{workspace.brief?.productName || "New cast"}</strong></div>
         <div className="onboarding-top-actions">
           {workspace.mode === "demo" ? <span className="status-pill"><span className="signal signal--live" /> Free demo · no credits</span> : null}
@@ -991,7 +1070,7 @@ function CastOnboarding(props: OnboardingProps) {
         <aside className="onboarding-aside">
           <span className="eyebrow">SET UP YOUR CAST</span>
           <h2>Three decisions.<br />Then the studio.</h2>
-          <p>Paste the product link, confirm what Hypecast understood, then choose the person who will carry the account.</p>
+          <p>Paste the product link, confirm what CueFace understood, then choose the person who will carry the account.</p>
           <div className="onboarding-steps">
             {onboardingSteps.map((label, index) => <button key={label} className={`${workspace.step === index ? "is-active" : ""} ${workspace.step > index ? "is-done" : ""}`} disabled={index > workspace.step} onClick={() => props.onUpdateWorkspace({ step: index })}><span>{workspace.step > index ? <Check size={14} /> : `0${index + 1}`}</span><strong>{label}</strong></button>)}
           </div>
@@ -1012,7 +1091,7 @@ function CastOnboarding(props: OnboardingProps) {
           {error ? <Notice message={error} onDismiss={props.onDismissError} /> : null}
           {workspace.step === 0 ? (
             <div className="onboarding-stage onboarding-stage--narrow">
-              <StageHeader step="01 / 03" eyebrow="READ THE LINK" title="Start with the actual product." description="Paste a public website or app-store link. Hypecast reads the page first and lets you correct the extracted direction before creating anything." />
+              <StageHeader step="01 / 03" eyebrow="READ THE LINK" title="Start with the actual product." description="Paste a public website or app-store link. CueFace reads the page first and lets you correct the extracted direction before creating anything." />
               <form className="onboarding-url-form" onSubmit={props.onAnalyze}>
                 <label htmlFor="studio-product-url">Website or app link</label>
                 <input id="studio-product-url" type="url" value={workspace.productUrl} placeholder="https://yourproduct.com" onChange={(event) => props.onUpdateWorkspace({ productUrl: event.target.value })} required autoFocus />
@@ -1039,7 +1118,7 @@ function CastOnboarding(props: OnboardingProps) {
 
           {workspace.step === 2 ? (
             <div className="onboarding-stage onboarding-stage--wide">
-              <StageHeader step="03 / 03" eyebrow="CHOOSE THE CAST" title="Who should carry the account?" description="Choose the person who feels native to the audience—not the most polished face. Hypecast will immediately turn that portrait into the first 15-second reel." />
+              <StageHeader step="03 / 03" eyebrow="CHOOSE THE CAST" title="Who should carry the account?" description="Choose the person who feels native to the audience—not the most polished face. CueFace will immediately turn that portrait into the first 15-second reel." />
               <div className="onboarding-cast-grid">
                 {workspace.creators.map((creator) => (
                   <button key={creator.id} className={`onboarding-cast-card ${workspace.selectedCreatorId === creator.id ? "is-selected" : ""}`} onClick={() => creator.imageStatus === "ready" && props.onChooseCreator(creator.id)} disabled={creator.imageStatus !== "ready"}>
@@ -1069,6 +1148,9 @@ type CastStudioProps = {
   busy: string;
   error: string;
   exportProgress: Record<string, number>;
+  bulkExportProgress: { current: number; total: number; percent: number } | null;
+  deviceSaveStatus: SaveStatus;
+  cloudSaveStatus: SaveStatus;
   capabilities: (AppCapabilities & { openrouter?: boolean }) | null;
   videoPlan: VideoPlan | null;
   onDismissError: () => void;
@@ -1084,7 +1166,19 @@ type CastStudioProps = {
   onGenerateImage: (direction: string) => Promise<boolean>;
   onGenerateVideo: (motionPrompt: string, duration: 15) => Promise<boolean>;
   onExport: (reel: Reel) => void;
+  onExportAll: () => void;
 };
+
+function SaveBadge({ status }: { status: SaveStatus }) {
+  const label = status.state === "saving"
+    ? `Saving to ${status.target}…`
+    : status.state === "error"
+      ? status.message || `${status.target === "cloud" ? "Cloud" : "Device"} save failed`
+      : status.state === "saved" && status.savedAt
+        ? `Saved to ${status.target} at ${new Date(status.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
+        : `Waiting to save to ${status.target}`;
+  return <div className={`cast-topbar-status is-${status.state}`}><span className="signal" />{label}</div>;
+}
 
 function CastStudio(props: CastStudioProps) {
   const { workspace, creator, selectedReel } = props;
@@ -1117,7 +1211,7 @@ function CastStudio(props: CastStudioProps) {
   return (
     <div className="cast-shell">
       <aside className="cast-sidebar">
-        <button className="brand" onClick={props.onReset}><span className="brand-mark">H</span><span>HYPECAST</span></button>
+        <button className="brand" onClick={props.onReset}><span className="brand-mark">C</span><span>CUEFACE</span></button>
         <span className="cast-nav-label">WORKSPACE</span>
         <nav className="cast-nav"><a className="is-active" href="#cast-studio"><LayoutGrid size={16} /><span>Cast studio</span></a><a href="#cast-backgrounds"><Library size={16} /><span>Backgrounds</span><small>{workspace.clips.length}</small></a><a href="#cast-reels"><FileVideo size={16} /><span>Reels</span><small>{workspace.reels.length}</small></a></nav>
         <div className="cast-sidebar-project"><span>ACTIVE PROJECT</span><strong>{workspace.brief?.productName}</strong><button onClick={props.onReset}>Start another product</button></div>
@@ -1135,7 +1229,7 @@ function CastStudio(props: CastStudioProps) {
       </aside>
 
       <main className="cast-main">
-        <header className="cast-topbar"><div><button className="studio-back-button" onClick={props.onChangeCast}><ArrowLeft size={14} /> Back to cast</button><span>CAST STUDIO / {creator.name.toUpperCase()}</span><h1>Make the next reel.</h1></div><div className="cast-topbar-status"><span className="signal signal--live" />{props.clerkEnabled ? <Show when="signed-in" fallback={<>Saved on this device</>}>Cloud autosave on</Show> : "Saved on this device"}</div></header>
+        <header className="cast-topbar"><div><button className="studio-back-button" onClick={props.onChangeCast}><ArrowLeft size={14} /> Back to cast</button><span>CAST STUDIO / {creator.name.toUpperCase()}</span><h1>Make the next reel.</h1></div>{props.clerkEnabled ? <Show when="signed-in" fallback={<SaveBadge status={props.deviceSaveStatus} />}><SaveBadge status={props.cloudSaveStatus} /></Show> : <SaveBadge status={props.deviceSaveStatus} />}</header>
         {props.error ? <Notice message={props.error} onDismiss={props.onDismissError} /> : null}
         <div className="cast-workbench" id="cast-studio">
           <section className="cast-assets-panel" id="cast-backgrounds">
@@ -1208,17 +1302,19 @@ function CastStudio(props: CastStudioProps) {
                   <label><span>Font</span><select aria-label="Reel font" value={selectedReel.fontFamily} onChange={(event) => props.onUpdateReel(selectedReel.id, { fontFamily: event.target.value as Reel["fontFamily"] })}><option value="sans">Clean sans</option><option value="serif">Editorial serif</option><option value="mono">Typewriter mono</option></select></label>
                   <label><span>Text size</span><select aria-label="Reel text size" value={selectedReel.fontSize} onChange={(event) => props.onUpdateReel(selectedReel.id, { fontSize: event.target.value as Reel["fontSize"] })}><option value="small">Compact</option><option value="medium">Standard</option><option value="large">Large</option></select></label>
                   <label><span>Placement</span><select value={selectedReel.position} onChange={(event) => props.onUpdateReel(selectedReel.id, { position: event.target.value as Reel["position"] })}><option value="top">Top safe zone</option><option value="center">Center</option><option value="bottom">Bottom safe zone</option></select></label>
-                  <label><span>Treatment</span><select value={selectedReel.style} onChange={(event) => props.onUpdateReel(selectedReel.id, { style: event.target.value as Reel["style"] })}><option value="glass">Smoked glass</option><option value="clean">Clean outline</option><option value="highlight">Hype orange</option></select></label>
+                  <label><span>Treatment</span><select value={selectedReel.style} onChange={(event) => props.onUpdateReel(selectedReel.id, { style: event.target.value as Reel["style"] })}><option value="glass">Smoked glass</option><option value="clean">Clean outline</option><option value="highlight">Cue coral</option></select></label>
                 </div>
                 <div className="story-actions"><button className="button" onClick={props.onBuildReels} disabled={props.busy === "stories"}>{props.busy === "stories" ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />} Rewrite batch</button><button className="button button--primary" onClick={() => props.onExport(selectedReel)} disabled={exporting}>{exporting ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}{exporting ? `Encoding ${props.exportProgress[selectedReel.id]}%` : "Export MP4"}</button></div>
+                <button className="button button--wide bulk-export-button" onClick={props.onExportAll} disabled={Boolean(props.bulkExportProgress) || workspace.reels.length !== 5}>{props.bulkExportProgress ? <LoaderCircle className="spin" size={15} /> : <FileArchive size={15} />}{props.bulkExportProgress ? `Exporting ${props.bulkExportProgress.current} of ${props.bulkExportProgress.total} · ${props.bulkExportProgress.percent}%` : "Export all 5 as ZIP"}</button>
                 {workspace.exports.length ? (
                   <div className="export-history"><span>EXPORT HISTORY · {workspace.exports.length}</span>{workspace.exports.slice(0, 3).map((item) => item.url ? <a key={item.id} href={item.url} target="_blank" rel="noreferrer"><FileVideo size={12} /><strong>{item.title}</strong><small>Cloud copy</small></a> : <div key={item.id}><Download size={12} /><strong>{item.title}</strong><small>Downloaded · saves after sign-in</small></div>)}</div>
                 ) : null}
+                {props.clerkEnabled ? <Show when="signed-in"><InstagramPublisher key={selectedReel.id} workspace={workspace} reel={selectedReel} onExport={props.onExport} /></Show> : null}
               </>
             ) : (
               <div className="story-empty">
                 <div className="story-structure"><span>01</span><p>Personal moment</p><span>02</span><p>What I assumed</p><span>03</span><p>What changed</p><span>04</span><p>What stayed with me</p></div>
-                <p>Hypecast will write five first-person experiences. The product is optional and never becomes the lesson.</p>
+                <p>CueFace will write five first-person experiences. The product is optional and never becomes the lesson.</p>
                 <button className="button button--primary button--wide" onClick={props.onBuildReels} disabled={props.busy === "stories"}>{props.busy === "stories" ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} Write five personal stories</button>
               </div>
             )}

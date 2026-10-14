@@ -108,7 +108,7 @@ class OpenRouterVideoProvider implements VideoProvider {
       Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
       "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      "X-Title": "Hypecast",
+      "X-Title": "CueFace",
     };
   }
 

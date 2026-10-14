@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const brief = bodySchema.parse(await request.json());
     let result = await parseStructured(
       hooksSchema,
-      "hypecast_reel_stories",
+      "cueface_reel_stories",
       STORY_SYSTEM_PROMPT,
       JSON.stringify(brief),
     );
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     if (issues.length) {
       result = await parseStructured(
         hooksSchema,
-        "hypecast_reel_stories_repaired",
+        "cueface_reel_stories_repaired",
         `${STORY_SYSTEM_PROMPT}
 
 REPAIR PASS
@@ -40,7 +40,7 @@ The prior draft violated the personal-story standard. Rewrite the complete batch
       );
       const remainingIssues = storyBatchIssues(result.hooks, brief.productName);
       if (remainingIssues.length) {
-        throw new Error("The writing model could not meet Hypecast's personal-story standard. Please rewrite the batch.");
+        throw new Error("The writing model could not meet CueFace's personal-story standard. Please rewrite the batch.");
       }
     }
     return Response.json(result);

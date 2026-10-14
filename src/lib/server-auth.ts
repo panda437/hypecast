@@ -23,6 +23,6 @@ export async function requireGenerationAccess() {
 export function routeError(error: unknown) {
   const status = error instanceof HttpError ? error.status : 500;
   const message = error instanceof Error ? error.message : "Something went wrong.";
-  console.error("Hypecast route error", { status, message });
+  console.error("CueFace route error", { status, message });
   return Response.json({ error: message }, { status });
 }

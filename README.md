@@ -1,8 +1,8 @@
-# Hypecast
+# CueFace
 
-Hypecast turns one public product URL into an AI creator and five editable, first-person Instagram Reels. The experience and lesson lead; the product stays incidental and may not appear at all.
+CueFace turns one public product URL into an AI creator and five editable, first-person Instagram Reels. The experience and lesson lead; the product stays incidental and may not appear at all.
 
-The first run is intentionally inexpensive: after the user chooses a creator, Hypecast reuses that exact portrait as a 15-second 9:16 background. The browser adds a gentle push-in and burns the editable text into a silent MP4. No video model is called.
+The first run is intentionally inexpensive: after the user chooses a creator, CueFace reuses that exact portrait as a 15-second 9:16 background. The browser adds a gentle push-in and burns the editable text into a silent MP4. No video model is called.
 
 ## Run locally
 
@@ -34,7 +34,7 @@ Open `http://localhost:3000` and choose **Try the zero-credit demo** to exercise
 
 ## Second-run background library
 
-The studio’s **Plan motion before spending** action uses free, editable motion recipes before an explicit OpenRouter call. Every new paid motion asset is one continuous 15-second generation—Hypecast does not repeat a shorter segment to fill the reel. The economy configuration selects 9:16, 480p, first-frame image-to-video models at or below $0.03 per output second. The currently pinned model is `x-ai/grok-imagine-video-1.5-lite`, verified at $0.02 per second plus a $0.01 image-input charge, or about $0.31 for 15 seconds. A generated background is paid for once, copied into Convex storage, and reused across many story batches. Video generation never occurs merely because the user changes reel text.
+The studio’s **Plan motion before spending** action uses free, editable motion recipes before an explicit OpenRouter call. Every new paid motion asset is one continuous 15-second generation—CueFace does not repeat a shorter segment to fill the reel. The economy configuration selects 9:16, 480p, first-frame image-to-video models at or below $0.03 per output second. The currently pinned model is `x-ai/grok-imagine-video-1.5-lite`, verified at $0.02 per second plus a $0.01 image-input charge, or about $0.31 for 15 seconds. A generated background is paid for once, copied into Convex storage, and reused across many story batches. Video generation never occurs merely because the user changes reel text.
 
 ## Quality gates
 
@@ -52,6 +52,12 @@ See [PRODUCT.md](./PRODUCT.md) for the resolved scope, assumptions, acceptance c
 - Initial video-generation spend: $0.
 - Future target: a reusable motion-background library and 30 reels per month.
 - Payments: deferred; Dodopayments is the planned billing layer.
-- Publishing: manual; Hypecast does not create or post to Instagram accounts.
+- Publishing: authenticated Instagram Creator/Business accounts can publish saved exports through Meta's API when the server-side publishing flag and credentials are enabled.
+
+## Instagram publishing beta
+
+Publishing is protected by two controls: the global `INSTAGRAM_PUBLISHING_ENABLED` kill switch and a per-connected-account on/off switch. The global switch defaults off. Tokens are encrypted before Convex storage and never enter the browser bundle. A reel must finish uploading to CueFace cloud storage before Meta can fetch and publish it.
+
+Required server variables are documented in `.env.example`. Meta must approve `instagram_business_basic` and `instagram_business_content_publish` before arbitrary customer accounts can use the production app.
 
 A generated-media claim is made only after a real provider result can be played or exported. The still-based first run is labelled honestly throughout the product.

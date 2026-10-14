@@ -58,4 +58,39 @@ export default defineSchema({
     exportedUrl: v.optional(v.string()),
     updatedAt: v.number(),
   }).index("by_project", ["projectId"]),
+
+  instagramConnections: defineTable({
+    ownerTokenIdentifier: v.string(),
+    instagramUserId: v.string(),
+    username: v.string(),
+    accountType: v.optional(v.string()),
+    encryptedAccessToken: v.string(),
+    tokenExpiresAt: v.optional(v.number()),
+    publishingEnabled: v.boolean(),
+    connectedAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_owner", ["ownerTokenIdentifier"]),
+
+  instagramPublications: defineTable({
+    ownerTokenIdentifier: v.string(),
+    publicationId: v.string(),
+    clientProjectId: v.string(),
+    exportId: v.string(),
+    reelId: v.string(),
+    caption: v.string(),
+    shareToFeed: v.boolean(),
+    containerId: v.optional(v.string()),
+    instagramMediaId: v.optional(v.string()),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("published"),
+      v.literal("failed"),
+    ),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["ownerTokenIdentifier"])
+    .index("by_owner_and_publication_id", ["ownerTokenIdentifier", "publicationId"]),
 });

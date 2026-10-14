@@ -63,7 +63,7 @@ export function ReelPreview({ reel, clip, compact = false }: ReelPreviewProps) {
           {activeCard.text}
         </div>
       ) : null}
-      <div className="reel-brand">HYPECAST / SILENT CUT</div>
+      <div className="reel-brand">CUEFACE / SILENT CUT</div>
       <div className="reel-time">{Math.floor(time).toString().padStart(2, "0")}:15</div>
     </div>
   );

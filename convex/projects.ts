@@ -19,6 +19,19 @@ export const listMine = query({
   },
 });
 
+export const getMineByClientId = query({
+  args: { clientProjectId: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await identityOrThrow(ctx);
+    return ctx.db
+      .query("projects")
+      .withIndex("by_owner_and_client_id", (q) =>
+        q.eq("ownerTokenIdentifier", identity.tokenIdentifier).eq("clientProjectId", args.clientProjectId),
+      )
+      .unique();
+  },
+});
+
 export const saveSnapshot = mutation({
   args: {
     clientProjectId: v.string(),

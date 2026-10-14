@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { demoBrief, demoClips, demoCreators, demoCreatorsForBrief, demoReferences, demoReels } from "./demo-data";
 import { storyBatchIssues } from "./story-standard";
 
-describe("the zero-credit Hypecast flow", () => {
+describe("the zero-credit CueFace flow", () => {
   it("preserves the MVP batch contract", () => {
     expect(demoCreators).toHaveLength(5);
     expect(new Set(demoCreators.map((creator) => creator.id)).size).toBe(5);

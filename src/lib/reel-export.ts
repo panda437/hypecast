@@ -107,16 +107,30 @@ async function imageFromUrl(url: string) {
   return image;
 }
 
-function download(blob: Blob, reel: Reel) {
+function safeFilePart(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64) || "reel";
+}
+
+export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `hypecast-${reel.id}.mp4`;
+  anchor.download = filename;
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
-export async function exportReel(reel: Reel, clip: VideoClip, onProgress: (progress: number) => void) {
+export function reelFilename(reel: Reel, index?: number) {
+  const prefix = index === undefined ? "" : `${String(index + 1).padStart(2, "0")}-`;
+  return `${prefix}${safeFilePart(reel.title)}.mp4`;
+}
+
+export async function exportReel(
+  reel: Reel,
+  clip: VideoClip,
+  onProgress: (progress: number) => void,
+  options: { download?: boolean; filename?: string } = {},
+) {
   const { ALL_FORMATS, BlobSource, BufferTarget, CanvasSource, Conversion, Input, Mp4OutputFormat, Output, Quality, VideoSampleSink } =
     await import("mediabunny");
   const canvas = document.createElement("canvas");
@@ -135,7 +149,7 @@ export async function exportReel(reel: Reel, clip: VideoClip, onProgress: (progr
       if (!track) throw new Error("The generated clip contains no readable video track.");
       const source = new CanvasSource(canvas, { codec: "avc", quality: new Quality("high") });
       output.addVideoTrack(source, { frameRate: 24 });
-      output.setMetadataTags({ title: `${reel.title} — Hypecast legacy motion with held ending` });
+      output.setMetadataTags({ title: `${reel.title} — CueFace legacy motion with held ending` });
       await output.start();
       const frameRate = 24;
       const sourceDuration = clip.duration || 5;
@@ -185,7 +199,7 @@ export async function exportReel(reel: Reel, clip: VideoClip, onProgress: (progr
             return canvas;
           },
         },
-        tags: { title: `${reel.title} — Hypecast` },
+        tags: { title: `${reel.title} — CueFace` },
       });
       if (!conversion.isValid) throw new Error("This browser cannot encode the selected clip as MP4.");
       conversion.onProgress = (progress) => onProgress(Math.round(progress * 100));
@@ -195,7 +209,7 @@ export async function exportReel(reel: Reel, clip: VideoClip, onProgress: (progr
     const image = await imageFromUrl(clip.posterUrl);
     const source = new CanvasSource(canvas, { codec: "avc", quality: new Quality("high") });
     output.addVideoTrack(source, { frameRate: 24 });
-    output.setMetadataTags({ title: `${reel.title} — Hypecast demo motion mock` });
+    output.setMetadataTags({ title: `${reel.title} — CueFace demo motion mock` });
     await output.start();
     const frameRate = 24;
     const frames = DURATION * frameRate;
@@ -217,6 +231,6 @@ export async function exportReel(reel: Reel, clip: VideoClip, onProgress: (progr
   if (!buffer) throw new Error("The browser encoder returned no MP4 data.");
   const blob = new Blob([buffer], { type: "video/mp4" });
   onProgress(100);
-  download(blob, reel);
+  if (options.download !== false) downloadBlob(blob, options.filename || `cueface-${safeFilePart(reel.title)}.mp4`);
   return blob;
 }

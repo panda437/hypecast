@@ -14,8 +14,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hypecast — Turn one product link into five reels",
+  metadataBase: new URL("https://www.cueface.com"),
+  title: "CueFace — Turn one product link into five reels",
   description: "Create a consistent AI creator and a launch-ready batch of silent, vertical product reels.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "CueFace — One cast. Five story-led reels.",
+    description: "Turn one product link into a consistent AI creator and five editable vertical reels.",
+    url: "https://www.cueface.com",
+    siteName: "CueFace",
+    type: "website",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

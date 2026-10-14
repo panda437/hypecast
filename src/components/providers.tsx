@@ -17,7 +17,7 @@ export function RootProviders({ children }: { children: React.ReactNode }) {
   const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   if (convexUrl && !convex) {
-    return <div className="provider-loading" aria-label="Connecting Hypecast" />;
+    return <div className="provider-loading" aria-label="Connecting CueFace" />;
   }
 
   if (clerkKey) {

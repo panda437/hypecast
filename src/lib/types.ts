@@ -122,8 +122,31 @@ export type WorkspaceSnapshot = {
   reels: Reel[];
   storyBatches: StoryBatch[];
   activeBatchId?: string;
+  activeReelId?: string;
   exports: ExportRecord[];
   updatedAt: number;
+};
+
+export type SaveStatus = {
+  state: "idle" | "saving" | "saved" | "error";
+  target: "device" | "cloud";
+  savedAt?: number;
+  message?: string;
+};
+
+export type InstagramConnection = {
+  connected: boolean;
+  username?: string;
+  accountType?: string;
+  publishingEnabled: boolean;
+  connectedAt?: number;
+  tokenExpiresAt?: number;
+};
+
+export type InstagramPublishingStatus = {
+  globallyEnabled: boolean;
+  configured: boolean;
+  connection: InstagramConnection;
 };
 
 export type SavedProject = {

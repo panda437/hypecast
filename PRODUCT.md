@@ -1,8 +1,8 @@
-# Hypecast — GrowthX Build Week MVP
+# CueFace — GrowthX Build Week MVP
 
 ## 1. Product thesis
 
-Hypecast turns one app URL into a reusable AI creator and five downloadable Instagram Reels. The first run deliberately does **not** generate AI video: it reuses the approved creator portrait as a 15-second 9:16 background and adds a subtle local push-in during export.
+CueFace turns one app URL into a reusable AI creator and five downloadable Instagram Reels. The first run deliberately does **not** generate AI video: it reuses the approved creator portrait as a 15-second 9:16 background and adds a subtle local push-in during export.
 
 This tests whether a credible creator sharing recognizable experiences can earn attention before paying for motion. The story must work as human content even when the product reference is removed. AI-generated background videos become optional reusable library assets in the second run. “Thirty reels per month” remains a future goal, not the Build Week promise.
 
@@ -41,7 +41,7 @@ The product has three intentionally distinct surfaces:
 - **Cast onboarding:** a focused three-decision flow for product, creative direction, and cast selection.
 - **Cast studio:** the persistent signed-in workspace for the selected creator, reusable background library, story batch, live preview, editing, and export.
 
-Navigation is explicit. The studio always shows both **Back to cast** and **Change cast**; the Hypecast logo is not the only exit. Returning to cast selection preserves the current studio. Choosing a different creator starts a separate studio record so the former cast, assets, scripts, and exports remain available under Recent Studios.
+Navigation is explicit. The studio always shows both **Back to cast** and **Change cast**; the CueFace logo is not the only exit. Returning to cast selection preserves the current studio. Choosing a different creator starts a separate studio record so the former cast, assets, scripts, and exports remain available under Recent Studios.
 
 ### Step 1 — Sign in
 
@@ -49,13 +49,13 @@ Production generation requires authentication because OpenAI image calls still h
 
 ### Step 2 — Analyze the product
 
-The user enters a public product URL. Hypecast safely extracts visible evidence and uses OpenAI to create an editable brief containing the product summary, audience, problem, differentiators, proof points, tone, creator persona, and human story territories.
+The user enters a public product URL. CueFace safely extracts visible evidence and uses OpenAI to create an editable brief containing the product summary, audience, problem, differentiators, proof points, tone, creator persona, and human story territories.
 
 The user approves this brief before media spend begins.
 
 ### Step 3 — Choose the AI creator
 
-Hypecast produces five distinct creator candidates that fit the approved persona. Each has a consistent character bible and portrait preview. The user selects one creator.
+CueFace produces five distinct creator candidates that fit the approved persona. Each has a consistent character bible and portrait preview. The user selects one creator.
 
 ### Step 4 — Lock the portrait
 
@@ -63,17 +63,17 @@ The selected candidate portrait becomes the first reusable background asset. The
 
 The user approves the portrait before composition. Future image or video additions must preserve its character bible. Motion planning is free: the studio offers concrete performance-and-camera recipes (for example a hair tuck and caught glance, a parked-car turn and smile, or a front-to-profile camera arc), shows whether the current still can support the idea, and exposes the exact editable prompt before any provider request.
 
-Every future video is image-to-video. The approved cast portrait, or an approved still derived from it, is required as the identity source. Hypecast shows the editable motion direction and the complete identity-locked provider prompt before spending credits. After submission, the exact prompt and source image remain visible and saved with the video asset.
+Every future video is image-to-video. The approved cast portrait, or an approved still derived from it, is required as the identity source. CueFace shows the editable motion direction and the complete identity-locked provider prompt before spending credits. After submission, the exact prompt and source image remain visible and saved with the video asset.
 
 ### Step 5 — Add the $0 background
 
-Hypecast places the portrait in the project’s background library as a 15-second still-based asset. The browser preview and exporter apply a gentle push-in so the result does not feel completely static.
+CueFace places the portrait in the project’s background library as a 15-second still-based asset. The browser preview and exporter apply a gentle push-in so the result does not feel completely static.
 
 No OpenRouter, fal, or other video request occurs in this step.
 
 ### Step 6 — Compose five reels
 
-AI writes five first-person stories about something the creator experienced, assumed, noticed, changed, or learned. The reusable structure is a small personal moment, the narrator’s original assumption, what changed, and an earned observation. The product is not the solution or payoff: no more than two stories in a batch may name it, each may name it once, and the final sentence must stay human. A validation pass automatically rewrites batches that slip into calls to action, feature pitching, or “then I found the product” pivots.
+AI writes five first-person stories about something the creator experienced, assumed, noticed, changed, or learned. The reusable structure is a small personal moment, the narrator’s original assumption, what changed, and an earned observation. The product is not the solution or payoff: only Story 5 may name it, at most once, and omission is preferred. The final sentence must stay human. A validation pass automatically rewrites batches that slip into calls to action, feature pitching, or “then I found the product” pivots.
 
 All five may reuse the same portrait because the first hypothesis is whether the creator’s perspective feels worth following—not whether the audience will tolerate five miniature ads.
 
@@ -84,13 +84,16 @@ The user can:
 - choose top, center, or bottom safe-zone placement;
 - choose the text treatment;
 - preview the 15-second reel;
-- export the current edit as a silent MP4.
+- export the current edit as a silent MP4;
+- export all five current edits as one ZIP, with visible sequential progress;
+- see Saving, confirmed Saved, or Save failed rather than an unverified autosave claim;
+- connect an Instagram Creator or Business account and publish a cloud-saved reel without leaving CueFace when the publishing beta is enabled.
 
 ## 6. Second-run background library
 
 Video generation is a library-building action, not part of the first-run funnel.
 
-Once the still-based format is validated, the user may generate a small number of new background videos through the provider adapter. Every new paid motion asset is generated as one continuous 15-second shot; Hypecast never repeats a shorter segment to fill the reel. A generated asset should be stored once and reused across many hooks and future batches. The product shows the estimated spend on the generation button and never regenerates a background merely because the story text changed.
+Once the still-based format is validated, the user may generate a small number of new background videos through the provider adapter. Every new paid motion asset is generated as one continuous 15-second shot; CueFace never repeats a shorter segment to fill the reel. A generated asset should be stored once and reused across many hooks and future batches. The product shows the estimated spend on the generation button and never regenerates a background merely because the story text changed.
 
 The studio’s **All cast assets** library is append-only from the user’s perspective. It lists the approved portrait, every derived portrait, every queued or completed video, and its status. **New cast asset** opens an explicit image/video composer. New images use the approved cast portrait as the identity source and exclude products, screenshots, logos, text, and collage elements. The video composer is visible but disabled with a clear explanation until an OpenRouter or fal credential is configured.
 
@@ -111,7 +114,10 @@ The OpenRouter adapter supports asynchronous submission, polling, and retrieval.
 - Stories 1–4 never name the product. Story 5 may mention it once incidentally, but omission is preferred.
 - In-browser preview.
 - Downloadable silent 9:16 H.264 MP4 export.
+- One-click ZIP export of all five current reels.
 - Local persistence plus authenticated Convex project/asset persistence.
+- Confirmed cloud-save state based on the completed Convex mutation.
+- Direct Instagram Reel publishing for connected professional accounts, protected by a global kill switch and a per-account switch.
 - Explicit studio navigation, non-destructive cast switching, and an all-assets library.
 - On-demand identity-consistent cast images that append to the library rather than replacing existing assets.
 - A provider-independent video adapter kept outside the first-run path.
@@ -124,7 +130,7 @@ The OpenRouter adapter supports asynchronous submission, polling, and retrieval.
 - Three generated reference images.
 - Three generated background videos per project.
 - Thirty generated reels per month.
-- Automated Instagram account creation or posting.
+- Automated Instagram account creation. Direct publishing is limited to user-connected professional Instagram accounts and remains behind a global kill switch.
 - Music, voiceover, dialogue, or lip-sync.
 - A CapCut-style timeline editor or timed multi-card text.
 - Multiple creator identities per project.
@@ -176,7 +182,7 @@ The OpenRouter adapter supports asynchronous submission, polling, and retrieval.
 - Model discovery enforces 15-second, 9:16, 480p, first-frame image-to-video support and a maximum $0.03-per-second output rate.
 - A generated video is ingested into the reusable library, not bound to one reel.
 - The same library asset may be used across many text stories.
-- Hypecast never labels a video generated until the provider returns a playable result.
+- CueFace never labels a video generated until the provider returns a playable result.
 
 ## 9. Assumptions
 
@@ -208,6 +214,9 @@ The first-run MVP is accepted only if a user can:
 14. Use a visible Back to cast or Change cast control without knowing that the logo is clickable.
 15. Generate an additional identity-consistent portrait and see it appended to All cast assets alongside every earlier image and video.
 16. Select a different creator without deleting the previous creator’s studio; reopen the former studio from Recent Studios.
+17. See a confirmed cloud-save timestamp after editing copy, media, typography, placement, or treatment.
+18. Download all five current reels in one ZIP without browser multi-download prompts.
+19. When publishing is enabled and Meta has approved the app, connect a professional Instagram account, turn publishing on or off, edit the caption, and publish a cloud-saved reel without opening Instagram.
 
 Technical acceptance also requires:
 
@@ -218,6 +227,8 @@ Technical acceptance also requires:
 - first-run code never calls the video-provider routes;
 - unavailable video providers are shown as unavailable before submission rather than failing silently;
 - queued video records and exact prompts are saved before polling, and completed clips are copied into durable project storage;
+- Instagram tokens are encrypted before database storage and are never returned to browser code;
+- the production-wide Instagram kill switch blocks connection and publishing routes when disabled;
 - tests, lint, typecheck, build, and browser export pass;
 - deployment and generated-media claims are made only after verification.
 
@@ -227,7 +238,7 @@ Technical acceptance also requires:
 | --- | --- | --- |
 | A still image feels too static | Watch time may suffer | Use a subtle push-in, strong timed hooks, and platform-native audio |
 | Five candidate images still cost money | Creator selection is the largest first-run media cost | Require brief approval first; later test text-first casting with one chosen image |
-| Stories turn into disguised ads | The account loses trust and the creator feels synthetic | Make the lived experience primary, restrict product naming to two stories, ban solution pivots, and run an automatic quality check |
+| Stories turn into disguised ads | The account loses trust and the creator feels synthetic | Make the lived experience primary, restrict product naming to Story 5 only, ban solution pivots, and run an automatic quality check |
 | Stories invent product claims | The founder could publish misleading content | Ground in extracted evidence and require editable approval |
 | Export fails in some browsers | A preview alone does not finish the job | Detect encoder failures and return an actionable error |
 | Video assets are generated but rarely reused | Library economics break | Show reuse counts and treat generation as an explicit library investment |
@@ -245,7 +256,7 @@ A useful initial signal is one of five posts reaching 500 organic views or clear
 
 1. Pick one Build Week product with founder permission.
 2. Approve one creator portrait.
-3. Write five first-person experiences; mention the product in no more than two.
+3. Write five first-person experiences; only Story 5 may mention the product, and omission is preferred.
 4. Export five 15-second still-based reels using the same portrait.
 5. Post one per day with native Instagram audio.
 6. Record 24-hour and 72-hour views, completion rate, shares, saves, profile visits, and link clicks.

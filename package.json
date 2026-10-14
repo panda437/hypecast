@@ -1,5 +1,5 @@
 {
-  "name": "hypecast",
+  "name": "cueface",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -12,6 +12,7 @@
   "dependencies": {
     "@clerk/nextjs": "^7.9.14",
     "cheerio": "^1.2.0",
+    "client-zip": "^2.5.1",
     "convex": "^1.46.0",
     "lucide-react": "^1.56.0",
     "mediabunny": "^1.61.4",

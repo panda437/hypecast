@@ -5,7 +5,7 @@ function draft(story: string): StoryDraft {
   return { title: "A personal note", angle: "what changed for me", story };
 }
 
-describe("the Hypecast personal-story standard", () => {
+describe("the CueFace personal-story standard", () => {
   it("accepts a personal batch where the product stays incidental", () => {
     const stories = [
       draft("i was standing in the bathroom with one earring on when i realized i'd been getting ready for people i didn't even like. i took it off, washed my face, and stayed home. the relief arrived before the guilt, which told me more than either feeling wanted to."),

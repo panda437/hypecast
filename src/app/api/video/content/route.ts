@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     const headers = new Headers({
       "Content-Type": upstream.headers.get("content-type") || "video/mp4",
       "Cache-Control": "private, max-age=300",
-      "Content-Disposition": `inline; filename="hypecast-${requestId}.mp4"`,
+      "Content-Disposition": `inline; filename="cueface-${requestId}.mp4"`,
     });
     const length = upstream.headers.get("content-length");
     if (length) headers.set("Content-Length", length);

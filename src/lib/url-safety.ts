@@ -94,7 +94,7 @@ export async function extractPublicPage(input: string) {
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
     response = await fetch(url, {
       redirect: "manual",
-      headers: { "user-agent": "HypecastBot/1.0 (+https://hypecast.app)" },
+      headers: { "user-agent": "CueFaceBot/1.0 (+https://cueface.com)" },
       signal: AbortSignal.timeout(8_000),
     });
     if (![301, 302, 303, 307, 308].includes(response.status)) break;

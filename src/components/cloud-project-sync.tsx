@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import type { PendingExport, SavedProject, WorkspaceSnapshot } from "@/lib/types";
+import type { PendingExport, SavedProject, SaveStatus, WorkspaceSnapshot } from "@/lib/types";
 
 type CloudProjectSyncProps = {
   workspace: WorkspaceSnapshot;
@@ -16,6 +16,7 @@ type CloudProjectSyncProps = {
   onExportStored: (id: string, url: string) => void;
   onRestore: (workspace: WorkspaceSnapshot) => void;
   onProjectsChanged: (projects: SavedProject[]) => void;
+  onSaveStatus: (status: SaveStatus) => void;
 };
 
 function withoutInlineMedia(workspace: WorkspaceSnapshot) {
@@ -50,6 +51,7 @@ export function CloudProjectSync({
   onExportStored,
   onRestore,
   onProjectsChanged,
+  onSaveStatus,
 }: CloudProjectSyncProps) {
   const { isSignedIn } = useAuth();
   const projects = useQuery(api.projects.listMine, isSignedIn ? {} : "skip");
@@ -61,6 +63,7 @@ export function CloudProjectSync({
   const [ready, setReady] = useState(false);
   const initialized = useRef(false);
   const uploading = useRef(new Set<string>());
+  const saveSequence = useRef(0);
 
   useEffect(() => {
     if (isSignedIn) return;
@@ -70,9 +73,10 @@ export function CloudProjectSync({
       setProjectClientId("");
       setReady(false);
       onProjectsChanged([]);
+      onSaveStatus({ state: "idle", target: "cloud" });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [isSignedIn, onProjectsChanged]);
+  }, [isSignedIn, onProjectsChanged, onSaveStatus]);
 
   useEffect(() => {
     if (!isSignedIn || !hydrated || projects === undefined) return;
@@ -131,18 +135,27 @@ export function CloudProjectSync({
 
   useEffect(() => {
     if (!ready || !isSignedIn || !workspace.clientProjectId || projectClientId !== workspace.clientProjectId) return;
+    const sequence = ++saveSequence.current;
+    onSaveStatus({ state: "saving", target: "cloud" });
     const timer = window.setTimeout(async () => {
-      const id = await saveSnapshot({
-        clientProjectId: workspace.clientProjectId,
-        productName: workspace.brief?.productName,
-        productUrl: workspace.productUrl || undefined,
-        stage: workspace.step,
-        snapshot: withoutInlineMedia(workspace),
-      });
-      setProjectId(id);
+      try {
+        const id = await saveSnapshot({
+          clientProjectId: workspace.clientProjectId,
+          productName: workspace.brief?.productName,
+          productUrl: workspace.productUrl || undefined,
+          stage: workspace.step,
+          snapshot: withoutInlineMedia(workspace),
+        });
+        setProjectId(id);
+        if (sequence === saveSequence.current) onSaveStatus({ state: "saved", target: "cloud", savedAt: Date.now() });
+      } catch (cause) {
+        if (sequence === saveSequence.current) {
+          onSaveStatus({ state: "error", target: "cloud", message: cause instanceof Error ? cause.message : "Cloud save failed" });
+        }
+      }
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [isSignedIn, projectClientId, ready, saveSnapshot, workspace]);
+  }, [isSignedIn, onSaveStatus, projectClientId, ready, saveSnapshot, workspace]);
 
   useEffect(() => {
     if (!projectId || !isSignedIn || projectClientId !== workspace.clientProjectId) return;

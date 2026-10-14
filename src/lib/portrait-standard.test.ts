@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { candidatePortraitPrompt, referencePortraitPrompt } from "./portrait-standard";
 
-describe("the Hypecast portrait-only standard", () => {
+describe("the CueFace portrait-only standard", () => {
   it("keeps product context out of creator casting", () => {
     const prompt = candidatePortraitPrompt("Maya Chen", "Maya is 29 with short dark hair and a rust overshirt.");
     expect(prompt).not.toContain("Mosaic");

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { composeVideoPrompt } from "./video-prompt";
 
-describe("the Hypecast image-to-video prompt", () => {
+describe("the CueFace image-to-video prompt", () => {
   it("locks every clip to the supplied character image", () => {
     const prompt = composeVideoPrompt("The creator blinks once and gives a restrained smile.");
     expect(prompt).toContain("supplied start image as the strict identity reference and first frame");

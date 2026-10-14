@@ -422,6 +422,11 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .studio-back-button { margin: 0 12px 0 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #171614; color: var(--ink); font-size: 9px; cursor: pointer; }
 .studio-back-button svg { margin-right: 4px; vertical-align: -3px; }
 .cast-topbar-status { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 9px; }
+.cast-topbar-status.is-saving .signal { background: var(--accent); animation: pulse-save 1s ease-in-out infinite; }
+.cast-topbar-status.is-saved .signal { background: var(--acid); box-shadow: 0 0 0 3px rgba(182,243,107,.1); }
+.cast-topbar-status.is-error { color: #ff9278; }
+.cast-topbar-status.is-error .signal { background: #ff6542; }
+@keyframes pulse-save { 50% { opacity: .35; transform: scale(.78); } }
 .cast-main > .notice { margin: 14px 24px 0; max-width: none; }
 .cast-workbench { min-height: calc(100vh - 86px); display: grid; grid-template-columns: 270px minmax(330px,1fr) 370px; }
 .cast-assets-panel, .story-panel { padding: 24px 20px; background: #10100f; }
@@ -530,12 +535,35 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .story-controls label { display: grid; gap: 6px; }
 .story-controls select { width: 100%; padding: 9px; font-size: 9px; }
 .story-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 14px; }
+.bulk-export-button { margin-top: 8px; background: #191816; }
 .export-history { display: grid; gap: 5px; margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
 .export-history > span { margin-bottom: 2px; color: var(--dim); font: 650 7px/1 var(--font-mono); letter-spacing: .1em; }
 .export-history > a, .export-history > div { min-width: 0; display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 6px; padding: 7px 8px; border: 1px solid var(--line-soft); border-radius: 6px; color: var(--muted); text-decoration: none; }
 .export-history > a:hover { border-color: var(--accent); }
 .export-history strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; }
 .export-history small { color: var(--dim); font-size: 7px; }
+.instagram-publisher { margin-top: 14px; padding: 12px; border: 1px solid rgba(255,101,66,.28); border-radius: 9px; background: linear-gradient(145deg, rgba(255,101,66,.06), transparent 55%), #141412; }
+.instagram-publisher-head, .instagram-publisher-head > div, .instagram-account, .instagram-feed-option, .instagram-muted, .instagram-notice { display: flex; align-items: center; }
+.instagram-publisher-head { justify-content: space-between; gap: 10px; }
+.instagram-publisher-head > div { gap: 6px; color: var(--accent-light); font: 650 8px/1 var(--font-mono); letter-spacing: .08em; }
+.publishing-switch { position: relative; cursor: pointer; }
+.publishing-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.publishing-switch span { min-width: 43px; display: inline-flex; justify-content: center; padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--dim); font: 700 7px/1 var(--font-mono); }
+.publishing-switch input:checked + span { border-color: rgba(182,243,107,.5); background: rgba(182,243,107,.08); color: var(--acid); }
+.instagram-muted, .instagram-connect p { gap: 6px; margin: 12px 0 0; color: var(--dim); font-size: 8px; line-height: 1.45; }
+.instagram-connect .button { margin-top: 10px; }
+.instagram-account { justify-content: space-between; gap: 8px; margin: 12px 0; padding: 8px; border: 1px solid var(--line-soft); border-radius: 7px; background: #10100f; }
+.instagram-account strong, .instagram-account span { display: block; }
+.instagram-account strong { font-size: 9px; }
+.instagram-account span { margin-top: 3px; color: var(--dim); font-size: 7px; }
+.instagram-account button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--dim); font-size: 7px; cursor: pointer; }
+.instagram-caption { display: grid; gap: 6px; }
+.instagram-caption > span { color: var(--dim); font: 650 7px/1 var(--font-mono); letter-spacing: .08em; }
+.instagram-caption textarea { width: 100%; padding: 8px; resize: vertical; font-size: 8px; line-height: 1.45; }
+.instagram-feed-option { gap: 7px; margin: 9px 0; color: var(--muted); font-size: 8px; }
+.instagram-feed-option input { accent-color: var(--accent); }
+.instagram-notice { gap: 5px; margin: 9px 0 0; color: #ff9278; font-size: 8px; line-height: 1.35; }
+.instagram-notice.is-success { color: var(--acid); }
 .story-empty { margin-top: 30px; }
 .story-empty > p { color: var(--muted); font-size: 11px; line-height: 1.55; }
 .story-structure { border-top: 1px solid var(--line); margin-bottom: 22px; }

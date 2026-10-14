@@ -43,7 +43,7 @@ export const demoBrief: ProductBrief = {
   source: {
     url: "https://example.com",
     title: "Mosaic — customer evidence to roadmap",
-    description: "A fictional product used to demonstrate Hypecast without spending generation credits.",
+    description: "A fictional product used to demonstrate CueFace without spending generation credits.",
     excerpt: "Capture feedback, reveal patterns, and make product decisions with evidence attached.",
   },
 };
