@@ -74,7 +74,7 @@ AI writes five product-native narrative stories. The setting depends on the prod
 The user can:
 
 - edit the exact text;
-- edit one full-duration story overlay shown throughout the reel;
+- export the generated copy as-is or optionally edit the one full-duration story overlay before download;
 - choose top, center, or bottom safe-zone placement;
 - choose the text treatment;
 - preview the 15-second reel;

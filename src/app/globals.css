@@ -451,6 +451,14 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .story-panel-head h2 { margin: 7px 0 0; font-size: 22px; letter-spacing: -.03em; }
 .draft-pill { height: fit-content; padding: 5px 7px; border: 1px solid var(--line); border-radius: 999px; color: var(--accent-light) !important; }
 .story-rule { margin: 22px 0 12px; padding: 10px; border: 1px solid rgba(182,243,107,.14); border-radius: 7px; background: rgba(182,243,107,.03); display: flex; justify-content: space-between; color: var(--acid); font: 650 8px/1 var(--font-mono); }
+.story-copy-head { min-height: 40px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.story-copy-head > div span, .story-copy-head > div small { display: block; }
+.story-copy-head > div span { color: var(--muted); font: 650 8px/1 var(--font-mono); letter-spacing: .12em; }
+.story-copy-head > div small { margin-top: 5px; color: var(--dim); font-size: 8px; }
+.story-copy-head .text-button { color: var(--accent-light); font-size: 10px; }
+.story-review { min-height: 290px; max-height: 370px; overflow: auto; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: #151412; }
+.story-review p { margin: 0; color: var(--ink); white-space: pre-wrap; font-size: 11px; line-height: 1.55; }
+.story-review small { display: block; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line-soft); color: var(--dim); font-size: 8px; line-height: 1.35; }
 .story-editor { display: grid; gap: 7px; }
 .story-editor > span, .story-controls label > span { color: var(--muted); font-size: 9px; }
 .story-editor textarea { width: 100%; min-height: 290px; padding: 13px; resize: vertical; font-size: 11px; line-height: 1.52; }

@@ -12,6 +12,7 @@ import {
   Library,
   LoaderCircle,
   LogIn,
+  Pencil,
   Play,
   Plus,
   Sparkles,
@@ -598,9 +599,11 @@ type CastStudioProps = {
 
 function CastStudio(props: CastStudioProps) {
   const { workspace, creator, selectedReel } = props;
+  const [editingReelId, setEditingReelId] = useState<string | null>(null);
   const story = selectedReel?.cards[0]?.text || "";
   const wordCount = story.trim() ? story.trim().split(/\s+/).length : 0;
   const exporting = selectedReel ? Boolean(props.exportProgress[selectedReel.id] && props.exportProgress[selectedReel.id] < 100) : false;
+  const isEditing = Boolean(selectedReel && editingReelId === selectedReel.id);
 
   return (
     <div className="cast-shell">
@@ -637,7 +640,15 @@ function CastStudio(props: CastStudioProps) {
             {selectedReel ? (
               <>
                 <div className="story-rule"><span>ONE TEXT · FULL DURATION</span><strong>00:00 — 00:15</strong></div>
-                <label className="story-editor"><span>Story</span><textarea value={story} rows={17} onChange={(event) => props.onUpdateStory(selectedReel, event.target.value)} /><small>{wordCount} words · aim for 80–145 · product facts should be checked before posting</small></label>
+                <div className="story-copy-head">
+                  <div><span>FINAL COPY</span><small>Ready to export as-is. Editing is optional.</small></div>
+                  <button className="text-button" onClick={() => setEditingReelId(isEditing ? null : selectedReel.id)}>{isEditing ? <Check size={14} /> : <Pencil size={14} />}{isEditing ? "Done editing" : "Edit copy"}</button>
+                </div>
+                {isEditing ? (
+                  <label className="story-editor"><textarea aria-label="Edit final story copy" value={story} rows={17} onChange={(event) => props.onUpdateStory(selectedReel, event.target.value)} /><small>Changes save automatically and update the reel preview · {wordCount} words</small></label>
+                ) : (
+                  <div className="story-review"><p>{story}</p><small>{wordCount} words · product facts should be checked before posting</small></div>
+                )}
                 <div className="story-controls">
                   <label><span>Placement</span><select value={selectedReel.position} onChange={(event) => props.onUpdateReel(selectedReel.id, { position: event.target.value as Reel["position"] })}><option value="top">Top safe zone</option><option value="center">Center</option><option value="bottom">Bottom safe zone</option></select></label>
                   <label><span>Treatment</span><select value={selectedReel.style} onChange={(event) => props.onUpdateReel(selectedReel.id, { style: event.target.value as Reel["style"] })}><option value="glass">Smoked glass</option><option value="clean">Clean outline</option><option value="highlight">Hype orange</option></select></label>
