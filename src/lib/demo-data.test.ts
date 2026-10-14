@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { demoClips, demoCreators, demoReferences, demoReels } from "./demo-data";
+import { demoBrief, demoClips, demoCreators, demoCreatorsForBrief, demoReferences, demoReels } from "./demo-data";
 import { storyBatchIssues } from "./story-standard";
 
 describe("the zero-credit Hypecast flow", () => {
@@ -27,5 +27,24 @@ describe("the zero-credit Hypecast flow", () => {
     expect(storyBatchIssues(drafts, "Mosaic")).toEqual([]);
     expect(drafts.filter((draft) => draft.story.includes("Mosaic"))).toHaveLength(0);
     expect(drafts.every((draft) => draft.story.trim().split(/\s+/).length <= 55)).toBe(true);
+  });
+
+  it("grounds the demo cast in the extracted direction", () => {
+    const creators = demoCreatorsForBrief({ ...demoBrief, audience: "Independent designers" });
+    expect(creators).toHaveLength(5);
+    expect(creators.every((creator) => creator.description.includes("independent designers"))).toBe(true);
+    expect(creators.every((creator) => creator.imageStatus === "ready")).toBe(true);
+  });
+
+  it("turns a planning product into personal, non-promotional moments", () => {
+    const reels = demoReels(demoClips(demoReferences(demoCreators[0])), {
+      ...demoBrief,
+      productName: "Linear",
+      oneLiner: "Purpose-built for planning and building products",
+    });
+    const drafts = reels.map((reel) => ({ title: reel.title, angle: reel.hook, story: reel.cards[0].text }));
+    expect(reels[0].title).toBe("the saturday list");
+    expect(reels[0].cards[0].text).toContain("friend arrived");
+    expect(storyBatchIssues(drafts, "Linear")).toEqual([]);
   });
 });

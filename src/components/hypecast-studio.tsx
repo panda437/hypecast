@@ -25,7 +25,7 @@ import {
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/api";
-import { demoBrief, demoClips, demoCreators, demoReels, demoReferences } from "@/lib/demo-data";
+import { demoClips, demoCreators, demoCreatorsForBrief, demoReels, demoReferences } from "@/lib/demo-data";
 import { DEFAULT_MOTION_RECIPE, MOTION_RECIPES } from "@/lib/motion-recipes";
 import { exportReel } from "@/lib/reel-export";
 import { composeVideoPrompt } from "@/lib/video-prompt";
@@ -47,7 +47,7 @@ import { CloudProjectSync } from "@/components/cloud-project-sync";
 const STORAGE_KEY = "hypecast-project-v2";
 const PROJECTS_STORAGE_KEY = "hypecast-project-history-v1";
 const REEL_DURATION = 15;
-const onboardingSteps = ["Product", "Direction", "Cast"];
+const onboardingSteps = ["Read link", "Review direction", "Choose cast"];
 
 type VideoPlan = {
   selected: {
@@ -88,12 +88,40 @@ function newId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
-function newWorkspace(): WorkspaceSnapshot {
-  return { ...emptyWorkspace, clientProjectId: newId("project"), updatedAt: Date.now() };
+function newWorkspace(mode: WorkspaceSnapshot["mode"] = "live"): WorkspaceSnapshot {
+  return { ...emptyWorkspace, mode, clientProjectId: newId("project"), updatedAt: Date.now() };
 }
 
 function cloneReels(reels: Reel[]) {
   return reels.map((reel) => ({ ...reel, cards: reel.cards.map((card) => ({ ...card })) }));
+}
+
+function materializeStoryBatch(drafts: Reel[]) {
+  const batchId = newId("batch");
+  const reels = drafts.map((reel, index) => ({
+    ...reel,
+    id: `${batchId}-reel-${index + 1}`,
+    cards: reel.cards.map((card) => ({ ...card, id: `${batchId}-card-${index + 1}` })),
+  }));
+  return {
+    reels,
+    batch: { id: batchId, createdAt: Date.now(), reels: cloneReels(reels) } satisfies StoryBatch,
+  };
+}
+
+function reelsFromHooks(
+  hooks: Array<{ title: string; angle: string; story: string }>,
+  clipId: string,
+) {
+  return hooks.map((item, index) => ({
+    id: `reel-${index + 1}`,
+    title: item.title,
+    clipId,
+    hook: item.story.split(/[.!?]/)[0] || item.angle,
+    cards: [{ id: `reel-${index + 1}-story`, text: item.story, start: 0, end: REEL_DURATION }],
+    position: "center" as const,
+    style: "glass" as const,
+  }));
 }
 
 function stillClip(reference: ReferenceImage, id = "clip-still", label = "Creator portrait · 15s"): VideoClip {
@@ -159,6 +187,7 @@ function normalizeWorkspace(saved: WorkspaceSnapshot): WorkspaceSnapshot {
 export function HypecastStudio() {
   const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   const [workspace, setWorkspace] = useState<WorkspaceSnapshot>(emptyWorkspace);
+  const [demoStarted, setDemoStarted] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [capabilities, setCapabilities] = useState<(AppCapabilities & { openrouter?: boolean }) | null>(null);
   const [videoPlan, setVideoPlan] = useState<VideoPlan | null>(null);
@@ -183,7 +212,7 @@ export function HypecastStudio() {
         if (saved) {
           setWorkspace(normalizeWorkspace(JSON.parse(saved) as WorkspaceSnapshot));
         } else {
-          setWorkspace(newWorkspace());
+          setWorkspace(newWorkspace(clerkEnabled ? "live" : "demo"));
         }
         const history = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
         if (history) {
@@ -202,7 +231,7 @@ export function HypecastStudio() {
       } catch {
         window.localStorage.removeItem(STORAGE_KEY);
         window.localStorage.removeItem(PROJECTS_STORAGE_KEY);
-        setWorkspace(newWorkspace());
+        setWorkspace(newWorkspace(clerkEnabled ? "live" : "demo"));
       }
       setHydrated(true);
     }, 0);
@@ -213,7 +242,7 @@ export function HypecastStudio() {
       .then(setVideoPlan)
       .catch(() => null);
     return () => window.clearTimeout(hydrateTimer);
-  }, []);
+  }, [clerkEnabled]);
 
   useEffect(() => {
     if (!hydrated || !workspace.clientProjectId) return;
@@ -370,11 +399,13 @@ export function HypecastStudio() {
   function openSavedProject(clientProjectId: string) {
     const project = savedProjects.find((item) => item.clientProjectId === clientProjectId);
     if (!project) return;
+    setDemoStarted(true);
     restoreWorkspace(project.snapshot);
   }
 
   function resetProject() {
-    setWorkspace(newWorkspace());
+    setWorkspace(newWorkspace(clerkEnabled ? "live" : "demo"));
+    setDemoStarted(false);
     setSelectedReelId("");
     setSelectedAssetId("");
     setError("");
@@ -386,8 +417,9 @@ export function HypecastStudio() {
     if (!workspace.productUrl) return;
     setBusy("analyzing");
     try {
-      const { brief } = await apiRequest<{ brief: ProductBrief }>("/api/analyze", { url: workspace.productUrl });
-      updateWorkspace({ mode: "live", brief, step: 1, creators: [], selectedCreatorId: undefined, activeCastId: undefined, references: [], clips: [], reels: [], storyBatches: [], activeBatchId: undefined, exports: [] });
+      const endpoint = workspace.mode === "demo" ? "/api/demo/analyze" : "/api/analyze";
+      const { brief } = await apiRequest<{ brief: ProductBrief }>(endpoint, { url: workspace.productUrl });
+      updateWorkspace({ brief, step: 1, creators: [], selectedCreatorId: undefined, activeCastId: undefined, references: [], clips: [], reels: [], storyBatches: [], activeBatchId: undefined, exports: [] });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not analyze that page.");
     } finally {
@@ -396,11 +428,12 @@ export function HypecastStudio() {
   }
 
   function startDemo() {
+    setDemoStarted(true);
     updateWorkspace({
       mode: "demo",
-      productUrl: demoBrief.source.url,
-      brief: demoBrief,
-      step: 1,
+      productUrl: "",
+      brief: undefined,
+      step: 0,
       creators: [],
       selectedCreatorId: undefined,
       activeCastId: undefined,
@@ -427,7 +460,7 @@ export function HypecastStudio() {
     setError("");
     if (workspace.mode === "demo") {
       await pause(450);
-      updateWorkspace({ creators: demoCreators, step: 2 });
+      updateWorkspace({ creators: demoCreatorsForBrief(workspace.brief), step: 2 });
       setBusy("");
       return;
     }
@@ -467,18 +500,20 @@ export function HypecastStudio() {
     updateWorkspace({ selectedCreatorId: id });
   }
 
-  function openCastStudio() {
+  async function openCastStudio() {
     if (!selectedCreator?.imageDataUrl) {
       setError("Choose a creator with a finished portrait first.");
       return;
     }
-    if (workspace.activeCastId === selectedCreator.id && workspace.clips.length) {
+    if (workspace.activeCastId === selectedCreator.id && workspace.clips.length && workspace.reels.length) {
       setSelectedAssetId((current) => current || workspace.clips[0].id);
       updateWorkspace({ step: 3 });
       setError("");
       return;
     }
 
+    setBusy("opening-studio");
+    setError("");
     const references = workspace.mode === "demo"
       ? demoReferences(selectedCreator)
       : [{
@@ -489,22 +524,37 @@ export function HypecastStudio() {
           status: "ready" as const,
         }];
     const clips = workspace.mode === "demo" ? demoClips(references) : [stillClip(references[0])];
-    setSelectedAssetId(clips[0].id);
-    setSelectedReelId("");
-    setWorkspace((current) => ({
-      ...current,
-      clientProjectId: current.activeCastId && current.activeCastId !== selectedCreator.id ? newId("project") : current.clientProjectId,
-      activeCastId: selectedCreator.id,
-      references,
-      clips,
-      reels: [],
-      storyBatches: [],
-      activeBatchId: undefined,
-      exports: [],
-      step: 3,
-      updatedAt: Date.now(),
-    }));
-    setError("");
+    try {
+      let drafts: Reel[];
+      if (workspace.mode === "demo") {
+        await pause(380);
+        drafts = demoReels(clips, workspace.brief);
+      } else {
+        if (!workspace.brief) throw new Error("The product direction is missing. Go back and analyze the product again.");
+        const { hooks } = await apiRequest<{ hooks: Array<{ title: string; angle: string; story: string }> }>("/api/hooks", workspace.brief);
+        drafts = reelsFromHooks(hooks, clips[0].id);
+      }
+      const { reels, batch } = materializeStoryBatch(drafts);
+      setSelectedAssetId(clips[0].id);
+      setSelectedReelId(reels[0].id);
+      setWorkspace((current) => ({
+        ...current,
+        clientProjectId: current.activeCastId && current.activeCastId !== selectedCreator.id ? newId("project") : current.clientProjectId,
+        activeCastId: selectedCreator.id,
+        references,
+        clips,
+        reels,
+        storyBatches: [batch],
+        activeBatchId: batch.id,
+        exports: [],
+        step: 3,
+        updatedAt: Date.now(),
+      }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not create the first reel.");
+    } finally {
+      setBusy("");
+    }
   }
 
   async function generateCastImage(direction: string) {
@@ -669,31 +719,17 @@ export function HypecastStudio() {
       let draftReels: Reel[];
       if (workspace.mode === "demo") {
         await pause(420);
-        draftReels = demoReels([chosenClip]);
+        draftReels = demoReels([chosenClip], workspace.brief);
       } else {
         const { hooks } = await apiRequest<{ hooks: Array<{ title: string; angle: string; story: string }> }>("/api/hooks", workspace.brief);
-        draftReels = hooks.map((item, index) => ({
-          id: `reel-${index + 1}`,
-          title: item.title,
-          clipId: chosenClip.id,
-          hook: item.story.split(/[.!?]/)[0] || item.angle,
-          cards: [{ id: `reel-${index + 1}-story`, text: item.story, start: 0, end: REEL_DURATION }],
-          position: "center",
-          style: "glass",
-        }));
+        draftReels = reelsFromHooks(hooks, chosenClip.id);
       }
-      const batchId = newId("batch");
-      const reels = draftReels.map((reel, index) => ({
-        ...reel,
-        id: `${batchId}-reel-${index + 1}`,
-        cards: reel.cards.map((card) => ({ ...card, id: `${batchId}-card-${index + 1}` })),
-      }));
-      const batch: StoryBatch = { id: batchId, createdAt: Date.now(), reels: cloneReels(reels) };
+      const { reels, batch } = materializeStoryBatch(draftReels);
       setWorkspace((current) => ({
         ...current,
         reels,
         storyBatches: [...current.storyBatches, batch],
-        activeBatchId: batchId,
+        activeBatchId: batch.id,
         step: 3,
         updatedAt: Date.now(),
       }));
@@ -814,7 +850,6 @@ export function HypecastStudio() {
       onReset={resetProject}
       onOpenProject={openSavedProject}
       onAnalyze={analyzeProduct}
-      onStartDemo={startDemo}
       onUpdateWorkspace={updateWorkspace}
       onUpdateBrief={updateBrief}
       onCreateCast={createCast}
@@ -839,10 +874,10 @@ export function HypecastStudio() {
       ) : null}
       {clerkEnabled ? (
         <>
-          <Show when="signed-out">{workspace.step === 0 ? <MarketingHome clerkEnabled onStartDemo={startDemo} /> : experience}</Show>
+          <Show when="signed-out">{workspace.step === 0 && !demoStarted ? <MarketingHome clerkEnabled onStartDemo={startDemo} /> : experience}</Show>
           <Show when="signed-in">{experience}</Show>
         </>
-      ) : workspace.step === 0 ? <MarketingHome clerkEnabled={false} onStartDemo={startDemo} /> : experience}
+      ) : workspace.step === 0 && !demoStarted ? <MarketingHome clerkEnabled={false} onStartDemo={startDemo} /> : experience}
     </>
   );
 }
@@ -867,7 +902,7 @@ function MarketingHome({ clerkEnabled, onStartDemo }: { clerkEnabled: boolean; o
           <div className="home-hero-copy">
             <span className="eyebrow">AI CREATOR STUDIO · BUILD WEEK MVP</span>
             <h1>Give your product<br />a cast worth <em>following.</em></h1>
-            <p>Hypecast turns one product link into a consistent AI creator and five story-led reels. Pick the face once. Change the story as often as you want.</p>
+            <p>Hypecast turns one product link into a consistent creator and five story-led reels. The free demo reads your real page, lets you choose the face, and builds the first still-image reel.</p>
             <div className="home-hero-actions">{studioButton}<button className="text-button" onClick={onStartDemo}><Play size={15} /> Try the zero-credit demo</button></div>
             <div className="home-proofline"><span>01 approved cast</span><span>05 editable stories</span><span>15s silent reels</span><span>$0 video generation</span></div>
           </div>
@@ -884,9 +919,9 @@ function MarketingHome({ clerkEnabled, onStartDemo }: { clerkEnabled: boolean; o
         <section className="home-thesis" id="how-it-works">
           <div><span className="eyebrow">THE CAST STAYS. THE STORIES CHANGE.</span><h2>Not another prompt box.<br />A repeatable creator workflow.</h2></div>
           <div className="home-steps">
-            <article><span>01</span><h3>Read the product</h3><p>Hypecast turns your public page into an editable creative direction grounded in what the product actually does.</p></article>
+            <article><span>01</span><h3>Paste the real link</h3><p>Hypecast reads the public page and shows you exactly what it extracted before anything is created.</p></article>
             <article><span>02</span><h3>Choose the cast</h3><p>Review five distinct creator candidates. The one you approve becomes the identity anchor for the account.</p></article>
-            <article><span>03</span><h3>Work in the studio</h3><p>Choose one cast image or reusable clip, write five stories, edit the exact text, preview, and export.</p></article>
+            <article><span>03</span><h3>Get the first reel</h3><p>The selected portrait becomes a 15-second still reel with editable text, ready to preview and export.</p></article>
           </div>
         </section>
 
@@ -922,7 +957,6 @@ type OnboardingProps = {
   onReset: () => void;
   onOpenProject: (clientProjectId: string) => void;
   onAnalyze: (event: FormEvent<HTMLFormElement>) => void;
-  onStartDemo: () => void;
   onUpdateWorkspace: (patch: Partial<WorkspaceSnapshot>) => void;
   onUpdateBrief: <K extends keyof ProductBrief>(key: K, value: ProductBrief[K]) => void;
   onCreateCast: () => void;
@@ -938,14 +972,17 @@ function CastOnboarding(props: OnboardingProps) {
       <header className="studio-topbar">
         <button className="brand" onClick={props.onReset}><span className="brand-mark">H</span><span>HYPECAST</span></button>
         <div className="studio-topbar-title"><span>CREATOR ONBOARDING</span><strong>{workspace.brief?.productName || "New cast"}</strong></div>
-        {props.clerkEnabled ? <Show when="signed-in" fallback={<SignInButton mode="modal"><button className="button button--small"><LogIn size={14} /> Sign in</button></SignInButton>}><UserButton /></Show> : <span className="status-pill">Local demo</span>}
+        <div className="onboarding-top-actions">
+          {workspace.mode === "demo" ? <span className="status-pill"><span className="signal signal--live" /> Free demo · no credits</span> : null}
+          {props.clerkEnabled ? <Show when="signed-in" fallback={<SignInButton mode="modal"><button className="button button--small"><LogIn size={14} /> Sign in</button></SignInButton>}><UserButton /></Show> : null}
+        </div>
       </header>
 
       <main className="onboarding-main">
         <aside className="onboarding-aside">
           <span className="eyebrow">SET UP YOUR CAST</span>
           <h2>Three decisions.<br />Then the studio.</h2>
-          <p>This is setup, not the product itself. Approve the product direction, choose one creator, then make every reel from their dedicated workspace.</p>
+          <p>Paste the product link, confirm what Hypecast understood, then choose the person who will carry the account.</p>
           <div className="onboarding-steps">
             {onboardingSteps.map((label, index) => <button key={label} className={`${workspace.step === index ? "is-active" : ""} ${workspace.step > index ? "is-done" : ""}`} disabled={index > workspace.step} onClick={() => props.onUpdateWorkspace({ step: index })}><span>{workspace.step > index ? <Check size={14} /> : `0${index + 1}`}</span><strong>{label}</strong></button>)}
           </div>
@@ -966,19 +1003,19 @@ function CastOnboarding(props: OnboardingProps) {
           {error ? <Notice message={error} onDismiss={props.onDismissError} /> : null}
           {workspace.step === 0 ? (
             <div className="onboarding-stage onboarding-stage--narrow">
-              <StageHeader step="01 / 03" eyebrow="PRODUCT" title="What are we casting for?" description="Paste the public product page. Hypecast will extract an editable creative brief before it spends anything on creator images." />
+              <StageHeader step="01 / 03" eyebrow="READ THE LINK" title="Start with the actual product." description="Paste a public website or app-store link. Hypecast reads the page first and lets you correct the extracted direction before creating anything." />
               <form className="onboarding-url-form" onSubmit={props.onAnalyze}>
-                <label htmlFor="studio-product-url">Public product URL</label>
-                <input id="studio-product-url" type="url" value={workspace.productUrl} placeholder="https://yourproduct.com" onChange={(event) => props.onUpdateWorkspace({ productUrl: event.target.value })} required />
-                <button className="button button--primary button--wide" disabled={busy === "analyzing"}>{busy === "analyzing" ? <LoaderCircle className="spin" size={17} /> : <WandSparkles size={17} />} Build the creative direction</button>
+                <label htmlFor="studio-product-url">Website or app link</label>
+                <input id="studio-product-url" type="url" value={workspace.productUrl} placeholder="https://yourproduct.com" onChange={(event) => props.onUpdateWorkspace({ productUrl: event.target.value })} required autoFocus />
+                <button className="button button--primary button--wide" disabled={busy === "analyzing"}>{busy === "analyzing" ? <LoaderCircle className="spin" size={17} /> : <WandSparkles size={17} />} {busy === "analyzing" ? "Reading the page…" : "Extract product details"}</button>
+                <p className="onboarding-demo-note">{workspace.mode === "demo" ? "Free demo: real page extraction, sample cast portraits, and a $0 still-image reel. No API credits are used." : "Live studio: AI refines the extracted page into a deeper creative direction."}</p>
               </form>
-              <button className="text-button onboarding-demo" onClick={props.onStartDemo}><Play size={15} /> Continue with the sample product instead</button>
             </div>
           ) : null}
 
           {workspace.step === 1 && workspace.brief ? (
             <div className="onboarding-stage">
-              <StageHeader step="02 / 03" eyebrow="DIRECTION" title="Make sure the premise is true." description="This is the source material for the cast and every future story. Fix anything vague, generic, or unsupported." />
+              <StageHeader step="02 / 03" eyebrow="EXTRACTED DIRECTION" title="Is this what the product actually is?" description="This came from the link you entered. Correct anything vague or wrong; the cast and the first reel will use the approved version." />
               <div className="brief-source"><span>{workspace.brief.source.title || workspace.brief.source.url}</span><a href={workspace.brief.source.url} target="_blank" rel="noreferrer">View source</a></div>
               <div className="form-grid onboarding-form-grid">
                 <label><span>Product name</span><input value={workspace.brief.productName} onChange={(event) => props.onUpdateBrief("productName", event.target.value)} /></label>
@@ -987,13 +1024,13 @@ function CastOnboarding(props: OnboardingProps) {
                 <label className="span-2"><span>Who the stories are for</span><textarea rows={3} value={workspace.brief.audience} onChange={(event) => props.onUpdateBrief("audience", event.target.value)} /></label>
                 <label className="span-2"><span>The tension worth writing about</span><textarea rows={3} value={workspace.brief.problem} onChange={(event) => props.onUpdateBrief("problem", event.target.value)} /></label>
               </div>
-              <div className="onboarding-action"><button className="button button--primary" onClick={props.onCreateCast} disabled={busy === "cast"}>{busy === "cast" ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} Approve and cast five creators</button><span>Live mode uses five image generations.</span></div>
+              <div className="onboarding-action"><button className="button button--primary" onClick={props.onCreateCast} disabled={busy === "cast"}>{busy === "cast" ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} {busy === "cast" ? "Creating the cast…" : "Approve and create five cast options"}</button><span>{workspace.mode === "demo" ? "Free demo uses five ready-made portraits tailored to this direction." : "Live mode generates five new portrait candidates."}</span></div>
             </div>
           ) : null}
 
           {workspace.step === 2 ? (
             <div className="onboarding-stage onboarding-stage--wide">
-              <StageHeader step="03 / 03" eyebrow="CAST" title="Who should tell these stories?" description="Choose the person who feels native to the audience—not the most polished face. Their appearance and character bible anchor future assets." />
+              <StageHeader step="03 / 03" eyebrow="CHOOSE THE CAST" title="Who should carry the account?" description="Choose the person who feels native to the audience—not the most polished face. Hypecast will immediately turn that portrait into the first 15-second reel." />
               <div className="onboarding-cast-grid">
                 {workspace.creators.map((creator) => (
                   <button key={creator.id} className={`onboarding-cast-card ${workspace.selectedCreatorId === creator.id ? "is-selected" : ""}`} onClick={() => creator.imageStatus === "ready" && props.onChooseCreator(creator.id)} disabled={creator.imageStatus !== "ready"}>
@@ -1002,7 +1039,7 @@ function CastOnboarding(props: OnboardingProps) {
                   </button>
                 ))}
               </div>
-              <div className="onboarding-action"><button className="button button--primary" onClick={props.onOpenStudio} disabled={!selectedCreator}><ArrowRight size={17} /> Open {selectedCreator?.name.split(" ")[0] || "cast"}&apos;s studio</button><span>The chosen portrait is reused. No new image or video call.</span></div>
+              <div className="onboarding-action"><button className="button button--primary" onClick={props.onOpenStudio} disabled={!selectedCreator || busy === "opening-studio"}>{busy === "opening-studio" ? <LoaderCircle className="spin" size={17} /> : <ArrowRight size={17} />} {busy === "opening-studio" ? "Creating the first reel…" : `Choose ${selectedCreator?.name.split(" ")[0] || "a cast"} and create reel`}</button><span>The chosen portrait becomes a 15-second still background with editable text.</span></div>
             </div>
           ) : null}
         </section>
@@ -1146,7 +1183,7 @@ function CastStudio(props: CastStudioProps) {
           </section>
 
           <section className="story-panel" id="cast-reels">
-            <div className="story-panel-head"><div><span>STORY DESK</span><h2>{selectedReel ? selectedReel.title : "Write the first batch"}</h2></div><span className="draft-pill">{workspace.mode === "demo" ? "DEMO" : "AI DRAFT"}</span></div>
+            <div className="story-panel-head"><div><span>STORY DESK</span><h2>{selectedReel ? selectedReel.title : "Write the first batch"}</h2></div><span className="draft-pill">{workspace.mode === "demo" ? "FREE DEMO" : "AI DRAFT"}</span></div>
             {selectedReel ? (
               <>
                 {workspace.storyBatches.length ? (

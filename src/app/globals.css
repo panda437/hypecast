@@ -342,6 +342,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .studio-topbar-title span, .studio-topbar-title strong { display: block; }
 .studio-topbar-title span { color: var(--dim); font: 650 8px/1 var(--font-mono); letter-spacing: .14em; }
 .studio-topbar-title strong { margin-top: 5px; font-size: 12px; font-weight: 620; }
+.onboarding-top-actions { display: flex; align-items: center; gap: 10px; }
 .onboarding-main { min-height: calc(100vh - 72px); display: grid; grid-template-columns: 320px minmax(0,1fr); }
 .onboarding-aside { padding: 70px 42px 30px; border-right: 1px solid var(--line-soft); background: rgba(15,15,13,.6); display: flex; flex-direction: column; }
 .onboarding-aside h2 { margin: 16px 0 14px; font-size: 34px; line-height: 1.02; letter-spacing: -.045em; }
@@ -377,6 +378,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .onboarding-url-form { display: grid; gap: 10px; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: #131311; }
 .onboarding-url-form label { color: var(--muted); font-size: 10px; }
 .onboarding-url-form input { width: 100%; padding: 16px; font-size: 15px; }
+.onboarding-demo-note { margin: 2px 2px 0; color: var(--dim); font-size: 10px; line-height: 1.5; }
 .onboarding-demo { margin: 18px auto 0; color: var(--accent-light); }
 .brief-source { display: flex; gap: 12px; align-items: center; padding: 11px 13px; margin-bottom: 18px; border: 1px solid var(--line-soft); border-radius: 8px; color: var(--muted); font-size: 10px; }
 .brief-source span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

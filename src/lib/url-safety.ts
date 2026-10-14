@@ -2,7 +2,7 @@ import { resolve4, resolve6 } from "node:dns/promises";
 import { isIP } from "node:net";
 import * as cheerio from "cheerio";
 
-const MAX_BYTES = 1_000_000;
+const MAX_BYTES = 3_000_000;
 const MAX_REDIRECTS = 3;
 
 function isBlockedIpv4(address: string) {
