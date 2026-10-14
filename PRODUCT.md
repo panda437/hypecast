@@ -4,7 +4,7 @@
 
 Hypecast turns one app URL into a reusable AI creator and five downloadable Instagram Reels. The first run deliberately does **not** generate AI video: it reuses the approved creator portrait as a 15-second 9:16 background and adds a subtle local push-in during export.
 
-This tests whether the creator, hook, and product story earn attention before paying for motion. AI-generated background videos become optional reusable library assets in the second run. “Thirty reels per month” remains a future goal, not the Build Week promise.
+This tests whether a credible creator sharing recognizable experiences can earn attention before paying for motion. The story must work as human content even when the product reference is removed. AI-generated background videos become optional reusable library assets in the second run. “Thirty reels per month” remains a future goal, not the Build Week promise.
 
 ## 2. The job
 
@@ -47,7 +47,7 @@ Production generation requires authentication because OpenAI image calls still h
 
 ### Step 2 — Analyze the product
 
-The user enters a public product URL. Hypecast safely extracts visible evidence and uses OpenAI to create an editable brief containing the product summary, audience, problem, differentiators, proof points, tone, creator persona, and hook territories.
+The user enters a public product URL. Hypecast safely extracts visible evidence and uses OpenAI to create an editable brief containing the product summary, audience, problem, differentiators, proof points, tone, creator persona, and human story territories.
 
 The user approves this brief before media spend begins.
 
@@ -69,7 +69,9 @@ No OpenRouter, fal, or other video request occurs in this step.
 
 ### Step 6 — Compose five reels
 
-AI writes five product-native narrative stories. The setting depends on the product and audience; the reusable structure is a specific incident, escalating details, a natural product role, and a sharp final reversal. All five may reuse the same portrait because story performance—not background variety—is the first hypothesis.
+AI writes five first-person stories about something the creator experienced, assumed, noticed, changed, or learned. The reusable structure is a small personal moment, the narrator’s original assumption, what changed, and an earned observation. The product is not the solution or payoff: no more than two stories in a batch may name it, each may name it once, and the final sentence must stay human. A validation pass automatically rewrites batches that slip into calls to action, feature pitching, or “then I found the product” pivots.
+
+All five may reuse the same portrait because the first hypothesis is whether the creator’s perspective feels worth following—not whether the audience will tolerate five miniature ads.
 
 The user can:
 
@@ -97,7 +99,7 @@ The existing OpenRouter adapter discovers compatible models dynamically and supp
 - Five creator candidates and one explicit selection.
 - Reuse of the selected portrait without extra reference-image generation.
 - One 15-second still-based background asset.
-- Five AI-written reel stories.
+- Five AI-written first-person reel stories with restrained, optional product presence.
 - One editable full-duration safe-zone story overlay per reel.
 - In-browser preview.
 - Downloadable silent 9:16 H.264 MP4 export.
@@ -206,7 +208,8 @@ Technical acceptance also requires:
 | --- | --- | --- |
 | A still image feels too static | Watch time may suffer | Use a subtle push-in, strong timed hooks, and platform-native audio |
 | Five candidate images still cost money | Creator selection is the largest first-run media cost | Require brief approval first; later test text-first casting with one chosen image |
-| Hooks invent product claims | The founder could publish misleading content | Ground in extracted evidence and require editable approval |
+| Stories turn into disguised ads | The account loses trust and the creator feels synthetic | Make the lived experience primary, restrict product naming to two stories, ban solution pivots, and run an automatic quality check |
+| Stories invent product claims | The founder could publish misleading content | Ground in extracted evidence and require editable approval |
 | Export fails in some browsers | A preview alone does not finish the job | Detect encoder failures and return an actionable error |
 | Video assets are generated but rarely reused | Library economics break | Show reuse counts and treat generation as an explicit library investment |
 | AI posts receive low reach | File creation is not business value | Test five hooks manually before automating volume |
@@ -215,7 +218,7 @@ Technical acceptance also requires:
 
 The critical hypothesis is:
 
-> A credible creator portrait plus a product-specific static text story is enough to learn whether the content angle earns attention—without paying for generated motion.
+> A credible creator sharing a personal, useful experience can earn attention while the product remains an almost invisible part of the world—not the point of the post.
 
 A useful initial signal is one of five posts reaching 500 organic views or clearly outperforming the founder’s recent median without trust backlash.
 
@@ -223,7 +226,7 @@ A useful initial signal is one of five posts reaching 500 organic views or clear
 
 1. Pick one Build Week product with founder permission.
 2. Approve one creator portrait.
-3. Write five grounded hooks.
+3. Write five first-person experiences; mention the product in no more than two.
 4. Export five 15-second still-based reels using the same portrait.
 5. Post one per day with native Instagram audio.
 6. Record 24-hour and 72-hour views, completion rate, shares, saves, profile visits, and link clicks.

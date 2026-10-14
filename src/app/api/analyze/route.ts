@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const brief = await parseStructured(
       briefSchema,
       "hypecast_product_brief",
-      "You are a careful product marketer. Ground every claim in supplied page evidence. Do not invent traction, customers, features, or outcomes. Write concise, editable material for silent short-form video. Return exactly the requested schema.",
+      "You are a careful audience researcher and personal-story editor, not a product marketer. Ground every product claim in supplied page evidence. Do not invent traction, customers, features, or outcomes. Frame hookAngles as human moments, private tensions, mistaken assumptions, or useful lessons the audience would recognize—not as product benefits or ad hooks. Write concise, editable material for silent short-form video. Return exactly the requested schema.",
       JSON.stringify(page),
     );
     return Response.json({

@@ -514,7 +514,7 @@ export function HypecastStudio() {
     hook: workspace.brief.hookAngles[0] || workspace.brief.oneLiner,
     cards: [{
       id: "preview-story",
-      text: "Your cast is ready. Choose a background, then Hypecast will write five specific stories with a real setup, a natural product cameo, and a sharp final line.",
+      text: "Your cast is ready. Choose a background, then Hypecast will write five first-person stories about something experienced, noticed, and learned. The product may appear as one quiet detail, or not at all.",
       start: 0,
       end: REEL_DURATION,
     }],
@@ -636,11 +636,11 @@ function MarketingHome({ clerkEnabled, onStartDemo }: { clerkEnabled: boolean; o
         <section className="home-story-format" id="story-format">
           <div className="story-format-copy">
             <span className="eyebrow">THE WRITING STANDARD</span>
-            <h2>A story first.<br />A product cameo second.</h2>
-            <p>The setting changes with the product, but the structure holds: start inside a specific situation, escalate through concrete details, let the product play a natural role, and end on the line that reframes everything.</p>
-            <div className="story-rhythm"><span>specific incident</span><ArrowRight size={14} /><span>escalation</span><ArrowRight size={14} /><span>natural product role</span><ArrowRight size={14} /><span>sharp reversal</span></div>
+            <h2>An experience first.<br />The product barely enters.</h2>
+            <p>The creator shares something personal: a small moment, what they assumed, what changed, and what they learned. If the product appears, it is an ordinary detail—not the hero or the lesson.</p>
+            <div className="story-rhythm"><span>personal moment</span><ArrowRight size={14} /><span>what I assumed</span><ArrowRight size={14} /><span>what changed</span><ArrowRight size={14} /><span>what stayed with me</span></div>
           </div>
-          <blockquote>“the roadmap did not need more opinions. it needed receipts.”<span>Illustrative B2B demo story</span></blockquote>
+          <blockquote>“taking good notes and noticing the right thing are completely different skills.”<span>Illustrative personal story</span></blockquote>
         </section>
 
         <section className="home-final-cta">
@@ -855,9 +855,9 @@ function CastStudio(props: CastStudioProps) {
               </>
             ) : (
               <div className="story-empty">
-                <div className="story-structure"><span>01</span><p>Specific incident</p><span>02</span><p>Escalation</p><span>03</span><p>Natural product role</p><span>04</span><p>Sharp final reversal</p></div>
-                <p>Hypecast will write five product-native mini-stories—not five variations of an ad headline.</p>
-                <button className="button button--primary button--wide" onClick={props.onBuildReels} disabled={props.busy === "stories"}>{props.busy === "stories" ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} Write five stories</button>
+                <div className="story-structure"><span>01</span><p>Personal moment</p><span>02</span><p>What I assumed</p><span>03</span><p>What changed</p><span>04</span><p>What stayed with me</p></div>
+                <p>Hypecast will write five first-person experiences. The product is optional and never becomes the lesson.</p>
+                <button className="button button--primary button--wide" onClick={props.onBuildReels} disabled={props.busy === "stories"}>{props.busy === "stories" ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} Write five personal stories</button>
               </div>
             )}
             <div className="studio-health"><span><i className={props.capabilities?.openai ? "is-ready" : ""} /> Writing model</span><span><i className="is-ready" /> $0 still mode</span><span><i className={props.capabilities?.convex ? "is-ready" : ""} /> Cloud save</span></div>

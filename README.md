@@ -1,6 +1,6 @@
 # Hypecast
 
-Hypecast turns one public product URL into an AI creator and five editable Instagram Reels.
+Hypecast turns one public product URL into an AI creator and five editable, first-person Instagram Reels. The experience and lesson lead; the product stays incidental and may not appear at all.
 
 The first run is intentionally inexpensive: after the user chooses a creator, Hypecast reuses that exact portrait as a 15-second 9:16 background. The browser adds a gentle push-in and burns the editable text into a silent MP4. No video model is called.
 
