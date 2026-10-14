@@ -10,9 +10,12 @@ describe("the Hypecast image-to-video prompt", () => {
     expect(prompt).toContain("The creator blinks once and gives a restrained smile.");
     expect(prompt).toContain("No speaking, lip-sync, identity drift");
     expect(prompt).toContain("additional person");
+    expect(prompt).toContain("within the first half-second");
+    expect(prompt).toContain("continuous 5-second shot");
   });
 
   it("trims the editable motion direction before submission", () => {
-    expect(composeVideoPrompt("  A slow, natural breath.  ")).toContain("MOTION DIRECTION:\nA slow, natural breath.\n");
+    expect(composeVideoPrompt("  A slow, natural breath.  ", 15)).toContain("MOTION DIRECTION:\nA slow, natural breath.\n");
+    expect(composeVideoPrompt("A camera arc.", 15)).toContain("continuous 15-second shot");
   });
 });

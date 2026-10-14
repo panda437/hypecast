@@ -8,11 +8,11 @@ function draft(story: string): StoryDraft {
 describe("the Hypecast personal-story standard", () => {
   it("accepts a personal batch where the product stays incidental", () => {
     const stories = [
-      draft("i used to trust whatever i remembered after a call. i put the notes in Mosaic once, then noticed my memory had been choosing the dramatic parts. what helped most was admitting that attention and evidence are not the same thing."),
-      draft("i kept saying yes to every idea because saying no felt rude. my week became a list of other people's urgency. eventually i learned that being responsive and being useful are not always the same choice."),
-      draft("i wrote everything down and still forgot what mattered. my pages looked responsible, but they never helped me make the next decision. i started ending each day with one sentence about what surprised me, and that was the part i could actually remember."),
-      draft("i opened Mosaic to find one note and realized i had been searching for proof of an answer i already wanted. i changed the question instead. the uncomfortable lesson was that organized evidence can still be used dishonestly."),
-      draft("i used to think the loudest reaction meant i had found the real problem. after a few wrong turns, i noticed the useful signals were usually quieter and repeated. now i wait before turning one vivid moment into a plan."),
+      draft("i was standing in the bathroom with one earring on when i realized i'd been getting ready for people i didn't even like. i took it off, washed my face, and stayed home. the relief arrived before the guilt, which told me more than either feeling wanted to."),
+      draft("i missed my stop because i was rehearsing a conversation that had already happened. on the walk back, i kept inventing better versions of myself: calmer, funnier, impossible to misunderstand. by the time i reached home, the real conversation felt smaller than all the imaginary ones."),
+      draft("my sister asked why i kept checking my reflection in the dark phone screen. i said i wasn't, then did it again. we both laughed, but i noticed how often i was trying to catch myself looking acceptable instead of actually being there."),
+      draft("at the red light, i caught the driver beside me singing with both hands on the wheel. she saw me watching, smiled, and kept going. i spent the next three blocks wondering when i had started treating joy like something embarrassing people should do privately."),
+      draft("i tucked my hair behind my ear before opening Mosaic, then did it again while nobody was looking. it was the exact nervous habit my mother has. i used to tease her for it. suddenly it felt less like a flaw and more like family."),
     ];
     expect(storyBatchIssues(stories, "Mosaic")).toEqual([]);
   });
@@ -22,6 +22,15 @@ describe("the Hypecast personal-story standard", () => {
     const issues = storyBatchIssues(stories, "Mosaic");
     expect(issues.some((issue) => issue.includes("more than once"))).toBe(true);
     expect(issues.some((issue) => issue.includes("sales or solution pivot"))).toBe(true);
-    expect(issues.some((issue) => issue.includes("maximum is two"))).toBe(true);
+    expect(issues.some((issue) => issue.includes("maximum is one"))).toBe(true);
+  });
+
+  it("rejects long batches and repeated workplace framing", () => {
+    const stories = Array.from({ length: 5 }, (_, index) => draft(
+      `i sat in a team meeting with a client and watched an invoice spreadsheet become the whole conversation. ${"really ".repeat(index + 35)}i left.`,
+    ));
+    const issues = storyBatchIssues(stories, "Mosaic");
+    expect(issues.some((issue) => issue.includes("35–55 words"))).toBe(true);
+    expect(issues.some((issue) => issue.includes("business or workplace language"))).toBe(true);
   });
 });

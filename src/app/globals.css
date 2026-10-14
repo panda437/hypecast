@@ -444,6 +444,29 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .asset-composer textarea { width: 100%; resize: vertical; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: #0e0e0d; color: var(--ink); font: 400 8px/1.45 var(--font-sans); }
 .asset-composer label > small { margin: 6px 0 10px; color: var(--dim); font-size: 7px; line-height: 1.4; }
 .asset-composer .button { min-height: 34px; font-size: 9px; }
+.motion-builder-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.motion-builder-head span, .motion-duration > span, .motion-source-note span { color: var(--dim); font: 650 7px/1 var(--font-mono); letter-spacing: .1em; }
+.motion-builder-head small { color: var(--acid); font-size: 7px; }
+.motion-recipe-grid { max-height: 210px; overflow-y: auto; display: grid; gap: 5px; padding-right: 2px; }
+.motion-recipe-grid > button { display: grid; grid-template-columns: 1fr auto; gap: 3px 7px; padding: 8px; border: 1px solid var(--line); border-radius: 7px; background: #10100f; color: var(--ink); text-align: left; cursor: pointer; }
+.motion-recipe-grid > button:hover, .motion-recipe-grid > button.is-active { border-color: var(--accent); background: rgba(255,101,66,.07); }
+.motion-recipe-grid > button > span { grid-column: 2; grid-row: 1; color: var(--accent-light); font: 600 6px/1 var(--font-mono); text-transform: uppercase; }
+.motion-recipe-grid > button > strong { grid-column: 1; grid-row: 1; font-size: 8px; }
+.motion-recipe-grid > button > small { grid-column: 1 / 3; color: var(--dim); font-size: 7px; line-height: 1.35; }
+.motion-source-note { margin: 8px 0; padding: 8px; border: 1px solid var(--line-soft); border-radius: 7px; background: #121210; }
+.motion-source-note p { margin: 5px 0 0; color: var(--muted); font-size: 7px; line-height: 1.4; }
+.motion-source-note > button { width: 100%; margin-top: 7px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 7px; border: 1px solid var(--accent); border-radius: 6px; background: rgba(255,101,66,.08); color: var(--accent-light); font-size: 7px; cursor: pointer; }
+.motion-duration { margin: 1px 0 8px; }
+.motion-duration > div { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px; }
+.motion-duration button { padding: 7px; border: 1px solid var(--line); border-radius: 6px; background: #10100f; color: var(--muted); text-align: left; cursor: pointer; }
+.motion-duration button.is-active { border-color: var(--acid); background: rgba(182,243,107,.05); color: var(--ink); }
+.motion-duration strong, .motion-duration small { display: block; }
+.motion-duration strong { font-size: 8px; }
+.motion-duration small { margin-top: 3px; color: var(--dim); font-size: 6px; line-height: 1.3; }
+.motion-spend-note { margin: 0 0 8px; color: var(--acid); font-size: 7px; line-height: 1.35; }
+.provider-prompt-preview { margin: 0 0 9px; padding: 7px 8px; border: 1px solid var(--line-soft); border-radius: 6px; background: #10100f; }
+.provider-prompt-preview summary { color: var(--accent-light); font-size: 7px; cursor: pointer; }
+.provider-prompt-preview p { max-height: 125px; overflow: auto; margin: 7px 0 0; color: var(--dim); white-space: pre-wrap; font: 400 7px/1.45 var(--font-mono); }
 .asset-list { max-height: 360px; overflow-y: auto; display: grid; gap: 9px; padding-right: 3px; }
 .asset-list > button { display: grid; grid-template-columns: 54px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; padding: 7px; border: 1px solid var(--line); border-radius: 9px; background: #151412; color: var(--ink); text-align: left; cursor: pointer; }
 .asset-list > button.is-selected { border-color: var(--accent); background: rgba(255,101,66,.05); }
@@ -497,6 +520,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .story-editor > span, .story-controls label > span { color: var(--muted); font-size: 9px; }
 .story-editor textarea { width: 100%; min-height: 290px; padding: 13px; resize: vertical; font-size: 11px; line-height: 1.52; }
 .story-editor small { color: var(--dim); font-size: 8px; line-height: 1.35; }
+.story-editor small.is-warning, .story-review small.is-warning { color: var(--accent-light); }
 .story-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 14px; }
 .story-controls label { display: grid; gap: 6px; }
 .story-controls select { width: 100%; padding: 9px; font-size: 9px; }

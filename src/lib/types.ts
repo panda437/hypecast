@@ -50,6 +50,7 @@ export type VideoClip = {
   generationPrompt?: string;
   referenceImageId: string;
   provider: "still" | "openrouter" | "fal" | "demo";
+  duration?: 5 | 15;
   status: "idle" | "queued" | "generating" | "ready" | "failed";
   requestId?: string;
   videoUrl?: string;

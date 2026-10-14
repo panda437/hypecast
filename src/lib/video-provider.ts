@@ -2,7 +2,7 @@ export type SubmitVideoInput = {
   prompt: string;
   startImageUrl: string;
   referenceImageUrls: string[];
-  duration: 15;
+  duration: 5 | 15;
 };
 
 export type VideoJobResult = {
@@ -31,6 +31,8 @@ export type VideoModelOption = {
   id: string;
   resolution: "480p";
   estimatedPerSecondUsd: number;
+  estimatedImageInputUsd: number;
+  estimatedPreviewUsd: number;
   estimatedClipUsd: number;
   estimatedBatchUsd: number;
 };
@@ -62,6 +64,7 @@ export async function listOpenRouterVideoOptions(): Promise<VideoModelOption[]> 
   return (payload.data || [])
     .filter(
       (model) =>
+        model.supported_durations?.includes(5) &&
         model.supported_durations?.includes(15) &&
         model.supported_aspect_ratios?.includes("9:16") &&
         model.supported_resolutions?.includes("480p") &&
@@ -71,11 +74,14 @@ export async function listOpenRouterVideoOptions(): Promise<VideoModelOption[]> 
       const price = estimate480p(model);
       if (price === null) return [];
       const imageInput = Number(model.pricing_skus?.cents_per_image_input || 0) / 100;
+      const estimatedPreviewUsd = Number((price * 5 + imageInput).toFixed(2));
       const estimatedClipUsd = Number((price * 15 + imageInput).toFixed(2));
       return [{
         id: model.id,
         resolution: "480p" as const,
         estimatedPerSecondUsd: price,
+        estimatedImageInputUsd: imageInput,
+        estimatedPreviewUsd,
         estimatedClipUsd,
         estimatedBatchUsd: Number((estimatedClipUsd * 3).toFixed(2)),
       }];

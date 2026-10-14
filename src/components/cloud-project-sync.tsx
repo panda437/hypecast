@@ -215,6 +215,7 @@ export function CloudProjectSync({
             metadata: {
               requestId: clip.requestId,
               referenceImageId: clip.referenceImageId,
+              duration: clip.duration || 15,
               motionPrompt: clip.motionPrompt,
               generationPrompt: clip.generationPrompt,
             },

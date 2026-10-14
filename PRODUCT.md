@@ -61,7 +61,7 @@ Hypecast produces five distinct creator candidates that fit the approved persona
 
 The selected candidate portrait becomes the first reusable background asset. The first run creates no additional reference images. This removes three image calls from the earlier scope.
 
-The user approves the portrait before composition. Future image or video additions must preserve its character bible.
+The user approves the portrait before composition. Future image or video additions must preserve its character bible. Motion planning is free: the studio offers concrete performance-and-camera recipes (for example a hair tuck and caught glance, a parked-car turn and smile, or a front-to-profile camera arc), shows whether the current still can support the idea, and exposes the exact editable prompt before any provider request.
 
 Every future video is image-to-video. The approved cast portrait, or an approved still derived from it, is required as the identity source. Hypecast shows the editable motion direction and the complete identity-locked provider prompt before spending credits. After submission, the exact prompt and source image remain visible and saved with the video asset.
 
@@ -90,11 +90,11 @@ The user can:
 
 Video generation is a library-building action, not part of the first-run funnel.
 
-Once the still-based format is validated, the user may generate a small number of new background videos through the provider adapter. A generated asset should be stored once and reused across many hooks and future batches. The product should show the estimated cost before submission and never regenerate a background merely because the hook text changed.
+Once the still-based format is validated, the user may generate a small number of new background videos through the provider adapter. The default paid experiment is a 5-second motion test, looped by Hypecast into the 15-second reel; a 15-second full generation remains an explicit alternative. A generated asset should be stored once and reused across many hooks and future batches. The product shows the estimated spend on the generation button and never regenerates a background merely because the story text changed.
 
 The studio’s **All cast assets** library is append-only from the user’s perspective. It lists the approved portrait, every derived portrait, every queued or completed video, and its status. **New cast asset** opens an explicit image/video composer. New images use the approved cast portrait as the identity source and exclude products, screenshots, logos, text, and collage elements. The video composer is visible but disabled with a clear explanation until an OpenRouter or fal credential is configured.
 
-The OpenRouter adapter supports asynchronous submission, polling, and retrieval. The current economy choice is `x-ai/grok-imagine-video-1.5-lite` at 480p: $0.02 per output second plus a $0.01 image-input charge, or about $0.31 for one 15-second clip at the price verified on October 14, 2026. A runtime price ceiling rejects or replaces any configured model above $0.03 per second. It remains inactive until the user explicitly chooses to add motion to the library. A fal adapter remains available as a later quality tier.
+The OpenRouter adapter supports asynchronous submission, polling, and retrieval. The current economy choice is `x-ai/grok-imagine-video-1.5-lite` at 480p: $0.02 per output second plus a $0.01 image-input charge, or about $0.11 for a 5-second test and $0.31 for one 15-second clip at the price verified on October 14, 2026. A runtime price ceiling rejects or replaces any configured model above $0.03 per second. It remains inactive until the user explicitly approves the final prompt and presses the spend-labelled generation button. A fal adapter remains available as a later quality tier.
 
 ## 7. MVP scope
 
@@ -107,6 +107,8 @@ The OpenRouter adapter supports asynchronous submission, polling, and retrieval.
 - One 15-second still-based background asset.
 - Five AI-written first-person reel stories with restrained, optional product presence.
 - One editable full-duration safe-zone story overlay per reel.
+- Each generated story is a readable 35–55-word personal micro-story; at least four of five avoid work and business settings entirely.
+- Stories 1–4 never name the product. Story 5 may mention it once incidentally, but omission is preferred.
 - In-browser preview.
 - Downloadable silent 9:16 H.264 MP4 export.
 - Local persistence plus authenticated Convex project/asset persistence.
@@ -171,7 +173,7 @@ The OpenRouter adapter supports asynchronous submission, polling, and retrieval.
 
 - OpenRouter remains the economy/default adapter because model choice and pricing can change without changing the editor.
 - The production credential is a server-only Vercel secret; no OpenRouter credential may appear in this document or repository.
-- Model discovery enforces 15-second, 9:16, 480p, first-frame image-to-video support and a maximum $0.03-per-second output rate.
+- Model discovery enforces both 5- and 15-second, 9:16, 480p, first-frame image-to-video support and a maximum $0.03-per-second output rate.
 - A generated video is ingested into the reusable library, not bound to one reel.
 - The same library asset may be used across many text stories.
 - Hypecast never labels a video generated until the provider returns a playable result.

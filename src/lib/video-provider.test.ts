@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { selectOpenRouterVideoOption } from "./video-provider";
 
 const compatible = {
-  supported_durations: [15],
+  supported_durations: [5, 15],
   supported_aspect_ratios: ["9:16"],
   supported_resolutions: ["480p"],
   supported_frame_images: ["first_frame"],
@@ -40,6 +40,7 @@ describe("OpenRouter video model selection", () => {
 
     expect(selected.id).toBe("x-ai/grok-imagine-video-1.5-lite");
     expect(selected.estimatedPerSecondUsd).toBe(0.02);
+    expect(selected.estimatedPreviewUsd).toBe(0.11);
     expect(selected.estimatedClipUsd).toBe(0.31);
   });
 });

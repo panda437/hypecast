@@ -110,7 +110,7 @@ function download(blob: Blob, reel: Reel) {
 }
 
 export async function exportReel(reel: Reel, clip: VideoClip, onProgress: (progress: number) => void) {
-  const { ALL_FORMATS, BlobSource, BufferTarget, CanvasSource, Conversion, Input, Mp4OutputFormat, Output, Quality } =
+  const { ALL_FORMATS, BlobSource, BufferTarget, CanvasSource, Conversion, Input, Mp4OutputFormat, Output, Quality, VideoSampleSink } =
     await import("mediabunny");
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH;
@@ -123,32 +123,67 @@ export async function exportReel(reel: Reel, clip: VideoClip, onProgress: (progr
     const response = await fetch(clip.videoUrl);
     if (!response.ok) throw new Error("The source clip could not be loaded for export.");
     const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(await response.blob()) });
-    const conversion = await Conversion.init({
-      input,
-      output,
-      trim: { start: 0, end: DURATION },
-      copy: false,
-      audio: { discard: true },
-      video: {
-        codec: "avc",
-        quality: new Quality("high"),
-        frameRate: 24,
-        forceTranscode: true,
-        processedWidth: WIDTH,
-        processedHeight: HEIGHT,
-        process: (sample) => {
+    if ((clip.duration || 15) < DURATION) {
+      const track = await input.getPrimaryVideoTrack();
+      if (!track) throw new Error("The generated clip contains no readable video track.");
+      const source = new CanvasSource(canvas, { codec: "avc", quality: new Quality("high") });
+      output.addVideoTrack(source, { frameRate: 24 });
+      output.setMetadataTags({ title: `${reel.title} — Hypecast looped motion` });
+      await output.start();
+      const frameRate = 24;
+      const sourceDuration = clip.duration || 5;
+      const sourceFrames = sourceDuration * frameRate;
+      const loops = Math.ceil(DURATION / sourceDuration);
+      let outputFrame = 0;
+      for (let loop = 0; loop < loops; loop += 1) {
+        const sink = new VideoSampleSink(track);
+        const timestamps = Array.from({ length: sourceFrames }, (_, frame) => frame / frameRate);
+        for await (const sample of sink.samplesAtTimestamps(timestamps)) {
+          if (outputFrame >= DURATION * frameRate) break;
+          if (!sample) {
+            outputFrame += 1;
+            continue;
+          }
+          const time = outputFrame / frameRate;
           ctx.fillStyle = "#090909";
           ctx.fillRect(0, 0, WIDTH, HEIGHT);
           sample.drawWithFit(ctx, { fit: "cover" });
-          drawOverlay(ctx, reel, sample.timestamp);
-          return canvas;
+          drawOverlay(ctx, reel, time);
+          await source.add(time, 1 / frameRate, { keyFrame: outputFrame % (frameRate * sourceDuration) === 0 });
+          sample.close();
+          outputFrame += 1;
+          if (outputFrame % 12 === 0) onProgress(Math.round((outputFrame / (DURATION * frameRate)) * 100));
+        }
+      }
+      await output.finalize();
+    } else {
+      const conversion = await Conversion.init({
+        input,
+        output,
+        trim: { start: 0, end: DURATION },
+        copy: false,
+        audio: { discard: true },
+        video: {
+          codec: "avc",
+          quality: new Quality("high"),
+          frameRate: 24,
+          forceTranscode: true,
+          processedWidth: WIDTH,
+          processedHeight: HEIGHT,
+          process: (sample) => {
+            ctx.fillStyle = "#090909";
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            sample.drawWithFit(ctx, { fit: "cover" });
+            drawOverlay(ctx, reel, sample.timestamp);
+            return canvas;
+          },
         },
-      },
-      tags: { title: `${reel.title} — Hypecast` },
-    });
-    if (!conversion.isValid) throw new Error("This browser cannot encode the selected clip as MP4.");
-    conversion.onProgress = (progress) => onProgress(Math.round(progress * 100));
-    await conversion.execute();
+        tags: { title: `${reel.title} — Hypecast` },
+      });
+      if (!conversion.isValid) throw new Error("This browser cannot encode the selected clip as MP4.");
+      conversion.onProgress = (progress) => onProgress(Math.round(progress * 100));
+      await conversion.execute();
+    }
   } else if (clip.posterUrl) {
     const image = await imageFromUrl(clip.posterUrl);
     const source = new CanvasSource(canvas, { codec: "avc", quality: new Quality("high") });

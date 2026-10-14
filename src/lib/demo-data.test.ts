@@ -25,6 +25,7 @@ describe("the zero-credit Hypecast flow", () => {
     const reels = demoReels(demoClips(demoReferences(demoCreators[0])));
     const drafts = reels.map((reel) => ({ title: reel.title, angle: reel.hook, story: reel.cards[0].text }));
     expect(storyBatchIssues(drafts, "Mosaic")).toEqual([]);
-    expect(drafts.filter((draft) => draft.story.includes("Mosaic"))).toHaveLength(2);
+    expect(drafts.filter((draft) => draft.story.includes("Mosaic"))).toHaveLength(0);
+    expect(drafts.every((draft) => draft.story.trim().split(/\s+/).length <= 55)).toBe(true);
   });
 });

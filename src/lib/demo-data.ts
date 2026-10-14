@@ -103,23 +103,24 @@ export function demoClips(references: ReferenceImage[]): VideoClip[] {
     motionPrompt: "A gentle local push-in gives the still subtle motion without a video-generation call",
     referenceImageId: references[0].id,
     provider: "still",
+    duration: 15,
     status: "ready",
     posterUrl: references[0].imageDataUrl,
   }];
 }
 
 const demoStories = [
-  "i used to leave customer calls feeling weirdly accomplished because my notebook was full. then a week later someone would ask what people were actually struggling with and i'd remember the mood, not the words. one friday i reread six pages and noticed i'd underlined the most dramatic sentence, not the most repeated problem. i put the calls in Mosaic after that, mostly so future me could stop pretending she had a perfect memory. the useful lesson was a little embarrassing: taking good notes and noticing the right thing are completely different skills.",
-  "last year i spent two weeks polishing a feature because one customer had described it with total confidence. i loved how certain they sounded, which should have been my first warning. when i went back through the other conversations, nobody else had mentioned it. not one person. i had confused conviction with frequency because conviction was easier to remember. we quietly shelved the idea, and i wrote a note above my desk: a vivid request is still only one request. i still catch myself forgetting that.",
-  "i had a phase where every piece of feedback became a tiny emergency. a screenshot in slack could rearrange my whole afternoon. one unhappy sentence would sit in my head longer than ten calm calls. i told myself i was being responsive, but mostly i was letting the newest feeling choose the next task. eventually i made myself wait until the same problem appeared again before calling it a pattern. the work got quieter after that. so did i. urgency had been giving me the pleasant feeling of movement without asking whether i was going anywhere.",
-  "the most useful roadmap meeting i ever had started with me being wrong. i had spent all morning building a careful argument for a feature i was sure people wanted. halfway through, i searched Mosaic for the original notes and realized i had combined three different complaints into one convenient story. nobody called me out. they just waited while i deleted half the slide. i expected to feel embarrassed, but mostly i felt relieved. changing my mind in public was uncomfortable for about thirty seconds. defending a bad idea would have lasted months.",
-  "i used to think organized people had one perfect system and never lost anything. meanwhile i had notes in six places and a weekly ritual of moving them into a seventh. i kept redesigning the setup because redesigning felt cleaner than reading what i had actually collected. one evening i stopped migrating everything and chose a single question i wanted the notes to answer. half of them suddenly did not matter. the problem was not that my system was messy. it was that i had been organizing without deciding what i needed to know.",
+  "i was standing in the bathroom with one earring on when i realized i'd been getting ready for people i didn't even like. i took it off, washed my face, and stayed home. the relief arrived before the guilt, which told me more than either feeling wanted to.",
+  "i missed my stop because i was rehearsing a conversation that had already happened. on the walk back, i kept inventing better versions of myself: calmer, funnier, impossible to misunderstand. by the time i reached home, the real conversation felt smaller than all the imaginary ones.",
+  "my sister asked why i kept checking my reflection in the dark phone screen. i said i wasn't, then did it again. we both laughed, but i noticed how often i was trying to catch myself looking acceptable instead of actually being there.",
+  "at the red light, i caught the driver beside me singing with both hands on the wheel. she saw me watching, smiled, and kept going. i spent the next three blocks wondering when i had started treating joy like something embarrassing people should do privately.",
+  "i tucked my hair behind my ear before opening the door, then did it again while nobody was looking. it was the exact nervous habit my mother has. i used to tease her for it. suddenly it felt less like a flaw and more like family.",
 ];
 
 export function demoReels(clips: VideoClip[]): Reel[] {
   return demoStories.map((story, index) => ({
     id: `reel-${index + 1}`,
-    title: ["My notebook was lying", "The confident request", "Everything felt urgent", "Being wrong in public", "The perfect system"][index],
+    title: ["one earring", "the missed stop", "the dark screen", "the red light", "my mother's habit"][index],
     clipId: clips[index % clips.length].id,
     hook: story.split(".")[0],
     cards: [{ id: `card-${index + 1}`, text: story, start: 0, end: 15 }],
