@@ -12,6 +12,7 @@ import type * as assets from "../assets.js";
 import type * as instagram from "../instagram.js";
 import type * as jobs from "../jobs.js";
 import type * as projects from "../projects.js";
+import type * as videoCredits from "../videoCredits.js";
 
 import type {
   ApiFromModules,
@@ -24,6 +25,7 @@ declare const fullApi: ApiFromModules<{
   instagram: typeof instagram;
   jobs: typeof jobs;
   projects: typeof projects;
+  videoCredits: typeof videoCredits;
 }>;
 
 /**

@@ -40,6 +40,6 @@ describe("OpenRouter video model selection", () => {
 
     expect(selected.id).toBe("x-ai/grok-imagine-video-1.5-lite");
     expect(selected.estimatedPerSecondUsd).toBe(0.02);
-    expect(selected.estimatedClipUsd).toBe(0.31);
+    expect(selected.estimatedClipUsd).toBe(selected.estimatedPerSecondUsd * 15 + selected.estimatedImageInputUsd);
   });
 });

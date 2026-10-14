@@ -49,6 +49,26 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_provider_request", ["provider", "providerRequestId"]),
 
+  videoCreditAccounts: defineTable({
+    ownerTokenIdentifier: v.string(),
+    limit: v.number(),
+    used: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_owner", ["ownerTokenIdentifier"]),
+
+  videoCreditEvents: defineTable({
+    ownerTokenIdentifier: v.string(),
+    clientRequestId: v.string(),
+    providerRequestId: v.optional(v.string()),
+    amount: v.number(),
+    status: v.union(v.literal("reserved"), v.literal("charged"), v.literal("refunded")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner_and_client_request", ["ownerTokenIdentifier", "clientRequestId"])
+    .index("by_owner_and_provider_request", ["ownerTokenIdentifier", "providerRequestId"]),
+
   reels: defineTable({
     ownerTokenIdentifier: v.string(),
     projectId: v.id("projects"),

@@ -31,7 +31,7 @@ The first product promise is:
 - **Frame:** 9:16 portrait with Instagram-safe text zones.
 - **Audio:** none; platform-native music can be added when posting.
 - **Output:** five H.264 MP4 files.
-- **Video-generation cost:** $0.
+- **Video credits used:** none.
 
 ## 5. End-to-end flow
 
@@ -65,7 +65,7 @@ The user approves the portrait before composition. Future image or video additio
 
 Every future video is image-to-video. The approved cast portrait, or an approved still derived from it, is required as the identity source. CueFace shows the editable motion direction and the complete identity-locked provider prompt before spending credits. After submission, the exact prompt and source image remain visible and saved with the video asset.
 
-### Step 5 — Add the $0 background
+### Step 5 — Add the included background
 
 CueFace places the portrait in the project’s background library as a 15-second still-based asset. The browser preview and exporter apply a gentle push-in so the result does not feel completely static.
 
@@ -93,11 +93,13 @@ The user can:
 
 Video generation is a library-building action, not part of the first-run funnel.
 
-Once the still-based format is validated, the user may generate a small number of new background videos through the provider adapter. Every new paid motion asset is generated as one continuous 15-second shot; CueFace never repeats a shorter segment to fill the reel. A generated asset should be stored once and reused across many hooks and future batches. The product shows the estimated spend on the generation button and never regenerates a background merely because the story text changed.
+Each subscriber has a durable allowance of 100 video credits. One successfully accepted AI video generation reserves and consumes one credit. A rejected or failed generation returns the credit automatically. Still-image reels and every preview, edit, export, download, and Instagram publish action consume no video credits.
+
+Once the still-based format is validated, the user may generate new background videos through the provider adapter. Every AI motion asset is generated as one continuous 15-second shot; CueFace never repeats a shorter segment to fill the reel. A generated asset should be stored once and reused across many hooks and future batches. The product charges one video credit per AI video generation and never charges for previews, edits, exports, downloads, or reusing an existing background.
 
 The studio’s **All cast assets** library is append-only from the user’s perspective. It lists the approved portrait, every derived portrait, every queued or completed video, and its status. **New cast asset** opens an explicit image/video composer. New images use the approved cast portrait as the identity source and exclude products, screenshots, logos, text, and collage elements. The video composer is visible but disabled with a clear explanation until an OpenRouter or fal credential is configured.
 
-The OpenRouter adapter supports asynchronous submission, polling, and retrieval. The current economy choice is `x-ai/grok-imagine-video-1.5-lite` at 480p: $0.02 per output second plus a $0.01 image-input charge, or about $0.31 for one continuous 15-second clip at the price verified on October 14, 2026. A runtime price ceiling rejects or replaces any configured model above $0.03 per second. It remains inactive until the user explicitly approves the final prompt and presses the spend-labelled generation button. A fal adapter remains available as a later quality tier.
+The OpenRouter adapter supports asynchronous submission, polling, and retrieval. Provider selection and wholesale pricing remain server-side and are never shown to subscribers. A private runtime price ceiling rejects or replaces models that exceed the operator’s budget. Generation remains inactive until the user approves the final prompt and presses the one-credit generation button. A fal adapter remains available as a later quality tier.
 
 ## 7. MVP scope
 
@@ -135,16 +137,16 @@ The OpenRouter adapter supports asynchronous submission, polling, and retrieval.
 - A CapCut-style timeline editor or timed multi-card text.
 - Multiple creator identities per project.
 - Analytics and automatic hook optimization.
-- Dodopayments, subscriptions, credits, and invoices.
+- Dodopayments checkout, subscription renewal webhooks, and invoices.
 
 ### Next useful additions
 
-- “Add motion to library” as an explicit paid/credit action.
+- Subscription-cycle credit replenishment through Dodopayments.
 - Reuse counts and cost-per-use for every background.
 - One-click replacement of the still with an existing library clip.
 - Brand-kit and typography presets.
 - Hook performance tracking.
-- Dodopayments credits after actual willingness to pay is established.
+- Plan upgrades and credit top-ups after actual willingness to pay is established.
 
 ## 8. Technical choices
 
@@ -179,7 +181,7 @@ The OpenRouter adapter supports asynchronous submission, polling, and retrieval.
 
 - OpenRouter remains the economy/default adapter because model choice and pricing can change without changing the editor.
 - The production credential is a server-only Vercel secret; no OpenRouter credential may appear in this document or repository.
-- Model discovery enforces 15-second, 9:16, 480p, first-frame image-to-video support and a maximum $0.03-per-second output rate.
+- Model discovery enforces 15-second, 9:16, 480p image-to-video support and a private operator-controlled price ceiling.
 - A generated video is ingested into the reusable library, not bound to one reel.
 - The same library asset may be used across many text stories.
 - CueFace never labels a video generated until the provider returns a playable result.
@@ -265,4 +267,4 @@ A useful initial signal is one of five posts reaching 500 organic views or clear
 
 ## 14. Definition of success
 
-One founder downloads five usable still-based reels, posts at least three, and learns enough from the hooks to justify either another $0 batch or one deliberate investment in a reusable video-library asset.
+One founder downloads five usable still-based reels, posts at least three, and learns enough from the hooks to justify another batch or using one video credit on a reusable library asset.

@@ -57,15 +57,13 @@ const REEL_DURATION = 15;
 const onboardingSteps = ["Read link", "Review direction", "Choose cast"];
 
 type VideoPlan = {
-  selected: {
-    id: string;
-    resolution: "480p";
-    estimatedPerSecondUsd: number;
-    estimatedImageInputUsd: number;
-    estimatedClipUsd: number;
-    estimatedBatchUsd: number;
-  };
-  maxPerSecondUsd: number;
+  available: boolean;
+};
+
+type VideoCredits = {
+  limit: number;
+  used: number;
+  remaining: number;
 };
 
 const emptyWorkspace: WorkspaceSnapshot = {
@@ -211,6 +209,7 @@ export function CueFaceStudio() {
   const [hydrated, setHydrated] = useState(false);
   const [capabilities, setCapabilities] = useState<(AppCapabilities & { openrouter?: boolean }) | null>(null);
   const [videoPlan, setVideoPlan] = useState<VideoPlan | null>(null);
+  const [videoCredits, setVideoCredits] = useState<VideoCredits | null>(null);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [selectedReelId, setSelectedReelId] = useState("");
@@ -272,6 +271,13 @@ export function CueFaceStudio() {
   }, [clerkEnabled]);
 
   useEffect(() => {
+    if (!clerkEnabled || workspace.mode !== "live" || workspace.step !== 3) return;
+    apiRequest<VideoCredits>("/api/video/credits")
+      .then(setVideoCredits)
+      .catch(() => setVideoCredits(null));
+  }, [clerkEnabled, workspace.mode, workspace.step]);
+
+  useEffect(() => {
     if (!hydrated || !workspace.clientProjectId) return;
     const savingTimer = window.setTimeout(() => setDeviceSaveStatus({ state: "saving", target: "device" }), 0);
     const timer = window.setTimeout(() => {
@@ -319,8 +325,9 @@ export function CueFaceStudio() {
       if (checking) return;
       checking = true;
       await Promise.allSettled(pendingVideoJobs.map(async (clip) => {
-        const result = await apiRequest<VideoClip>("/api/video/status", { requestId: clip.requestId });
+        const result = await apiRequest<VideoClip & { credits?: VideoCredits }>("/api/video/status", { requestId: clip.requestId });
         if (cancelled) return;
+        if (result.credits) setVideoCredits(result.credits);
         setWorkspace((current) => ({
           ...current,
           clips: current.clips.map((item) => item.id === clip.id ? {
@@ -714,12 +721,15 @@ export function CueFaceStudio() {
         status: VideoClip["status"];
         generationPrompt?: string;
         videoUrl?: string;
+        credits: VideoCredits;
       }>("/api/video/submit", {
         prompt: motionPrompt,
         startImageUrl: reference.imageDataUrl,
         referenceImageUrls: [reference.imageDataUrl],
         duration,
+        clientRequestId: clipId,
       });
+      setVideoCredits(result.credits);
       setWorkspace((current) => ({
         ...current,
         clips: current.clips.map((item) => item.id === clipId ? {
@@ -916,6 +926,7 @@ export function CueFaceStudio() {
       cloudSaveStatus={cloudSaveStatus}
       capabilities={capabilities}
       videoPlan={videoPlan}
+      videoCredits={videoCredits}
       savedProjects={savedProjects}
       onDismissError={() => setError("")}
       onReset={resetProject}
@@ -998,7 +1009,7 @@ function MarketingHome({ clerkEnabled, onStartDemo }: { clerkEnabled: boolean; o
             <h1>Give your product<br />a cast worth <em>following.</em></h1>
             <p>CueFace turns one product link into a consistent creator and five story-led reels. The free demo reads your real page, lets you choose the face, and builds the first still-image reel.</p>
             <div className="home-hero-actions">{studioButton}<button className="text-button" onClick={onStartDemo}><Play size={15} /> Try the zero-credit demo</button></div>
-            <div className="home-proofline"><span>01 approved cast</span><span>05 editable stories</span><span>15s silent reels</span><span>$0 video generation</span></div>
+            <div className="home-proofline"><span>01 approved cast</span><span>05 editable stories</span><span>15s silent reels</span><span>Exports included</span></div>
           </div>
           <div className="home-product-shot" aria-label="CueFace studio preview">
             <div className="home-shot-top"><span>CAST / MAYA</span><strong>Story 01</strong><small>15 SEC</small></div>
@@ -1135,7 +1146,7 @@ function CastOnboarding(props: OnboardingProps) {
           <div className="onboarding-steps">
             {onboardingSteps.map((label, index) => <button key={label} className={`${workspace.step === index ? "is-active" : ""} ${workspace.step > index ? "is-done" : ""}`} disabled={index > workspace.step} onClick={() => props.onUpdateWorkspace({ step: index })}><span>{workspace.step > index ? <Check size={14} /> : `0${index + 1}`}</span><strong>{label}</strong></button>)}
           </div>
-          <div className="onboarding-budget"><strong>$0 first-run video spend</strong><span>The selected portrait becomes the first reusable background.</span></div>
+          <div className="onboarding-budget"><strong>No video credit needed for the first reel</strong><span>The selected portrait becomes the first reusable background.</span></div>
           {props.savedProjects.some((project) => project.clientProjectId !== workspace.clientProjectId && project.snapshot.step > 0) ? (
             <div className="saved-projects saved-projects--onboarding">
               <span>RECENT STUDIOS</span>
@@ -1157,7 +1168,7 @@ function CastOnboarding(props: OnboardingProps) {
                 <label htmlFor="studio-product-url">Website or app link</label>
                 <input id="studio-product-url" type="url" value={workspace.productUrl} placeholder="https://yourproduct.com" onChange={(event) => props.onUpdateWorkspace({ productUrl: event.target.value })} required autoFocus />
                 <button className="button button--primary button--wide" disabled={busy === "analyzing"}>{busy === "analyzing" ? <LoaderCircle className="spin" size={17} /> : <WandSparkles size={17} />} {busy === "analyzing" ? "Reading the page…" : "Extract product details"}</button>
-                <p className="onboarding-demo-note">{workspace.mode === "demo" ? "Free demo: real page extraction, sample cast portraits, and a $0 still-image reel. No API credits are used." : "Live studio: AI refines the extracted page into a deeper creative direction."}</p>
+                <p className="onboarding-demo-note">{workspace.mode === "demo" ? "Free demo: real page extraction, sample cast portraits, and a still-image reel. No video credits are used." : "Live studio: AI refines the extracted page into a deeper creative direction."}</p>
               </form>
             </div>
           ) : null}
@@ -1234,6 +1245,7 @@ type CastStudioProps = {
   cloudSaveStatus: SaveStatus;
   capabilities: (AppCapabilities & { openrouter?: boolean }) | null;
   videoPlan: VideoPlan | null;
+  videoCredits: VideoCredits | null;
   onDismissError: () => void;
   onReset: () => void;
   onChangeCast: () => void;
@@ -1277,8 +1289,8 @@ function CastStudio(props: CastStudioProps) {
   const isEditing = Boolean(selectedReel && editingReelId === selectedReel.id);
   const videoAvailable = Boolean(props.capabilities?.openrouter || props.capabilities?.fal);
   const selectedRecipe = MOTION_RECIPES.find((recipe) => recipe.id === selectedRecipeId) || DEFAULT_MOTION_RECIPE;
-  const videoEstimate = props.videoPlan?.selected.estimatedClipUsd;
-  const videoEstimateLabel = videoEstimate === undefined ? "price checking" : `$${videoEstimate.toFixed(2)}`;
+  const creditsRemaining = props.videoCredits?.remaining;
+  const canGenerateVideo = Boolean(props.videoPlan?.available && creditsRemaining && creditsRemaining > 0);
   const providerPromptPreview = composeVideoPrompt(motionPrompt);
 
   async function submitAsset(event: FormEvent<HTMLFormElement>) {
@@ -1310,7 +1322,7 @@ function CastStudio(props: CastStudioProps) {
       </aside>
 
       <main className="cast-main">
-        <header className="cast-topbar"><div><button className="studio-back-button" onClick={props.onChangeCast}><ArrowLeft size={14} /> Back to cast</button><span>CAST STUDIO / {creator.name.toUpperCase()}</span><h1>Make the next reel.</h1></div>{props.clerkEnabled ? <Show when="signed-in" fallback={<SaveBadge status={props.deviceSaveStatus} />}><SaveBadge status={props.cloudSaveStatus} /></Show> : <SaveBadge status={props.deviceSaveStatus} />}</header>
+        <header className="cast-topbar"><div><button className="studio-back-button" onClick={props.onChangeCast}><ArrowLeft size={14} /> Back to cast</button><span>CAST STUDIO / {creator.name.toUpperCase()}</span><h1>Make the next reel.</h1></div><div className="cast-topbar-actions">{props.videoCredits ? <div className="video-credit-balance"><FileVideo size={13} /><strong>{props.videoCredits.remaining}</strong><span>video credits</span></div> : null}{props.clerkEnabled ? <Show when="signed-in" fallback={<SaveBadge status={props.deviceSaveStatus} />}><SaveBadge status={props.cloudSaveStatus} /></Show> : <SaveBadge status={props.deviceSaveStatus} />}</div></header>
         {props.error ? <Notice message={props.error} onDismiss={props.onDismissError} /> : null}
         <div className="cast-workbench" id="cast-studio">
           <section className="cast-assets-panel" id="cast-backgrounds">
@@ -1325,7 +1337,7 @@ function CastStudio(props: CastStudioProps) {
                   <label><span>PORTRAIT DIRECTION</span><textarea value={imageDirection} rows={5} onChange={(event) => setImageDirection(event.target.value)} /><small>Uses the approved cast portrait as the identity source. The prompt keeps the person alone and excludes product screenshots.</small></label>
                 ) : (
                   <div className="motion-builder">
-                    <div className="motion-builder-head"><span>CHOOSE A DIRECTION</span><small>$0 to choose, inspect, and edit</small></div>
+                    <div className="motion-builder-head"><span>CHOOSE A DIRECTION</span><small>No credit used while editing</small></div>
                     <div className="motion-recipe-grid">
                       {MOTION_RECIPES.map((recipe) => (
                         <button type="button" key={recipe.id} className={selectedRecipe.id === recipe.id ? "is-active" : ""} onClick={() => { setSelectedRecipeId(recipe.id); setMotionPrompt(recipe.motionPrompt); }}>
@@ -1333,27 +1345,27 @@ function CastStudio(props: CastStudioProps) {
                         </button>
                       ))}
                     </div>
-                    <div className="motion-source-note"><div><span>SOURCE CHECK</span><p>{selectedRecipe.sourceNote}</p></div>{selectedRecipe.requiresNewImage ? <button type="button" onClick={() => { setImageDirection(selectedRecipe.imageDirection); void props.onGenerateImage(selectedRecipe.imageDirection); }} disabled={props.busy === "image-asset"}>{props.busy === "image-asset" ? <LoaderCircle className="spin" size={13} /> : <ImageIcon size={13} />} Use image credits · create car still</button> : null}</div>
+                    <div className="motion-source-note"><div><span>SOURCE CHECK</span><p>{selectedRecipe.sourceNote}</p></div>{selectedRecipe.requiresNewImage ? <button type="button" onClick={() => { setImageDirection(selectedRecipe.imageDirection); void props.onGenerateImage(selectedRecipe.imageDirection); }} disabled={props.busy === "image-asset"}>{props.busy === "image-asset" ? <LoaderCircle className="spin" size={13} /> : <ImageIcon size={13} />} Create matching car still</button> : null}</div>
                     <label><span>FINAL MOTION PROMPT · EDIT ANYTHING</span><textarea value={motionPrompt} rows={7} onChange={(event) => setMotionPrompt(event.target.value)} /><small>Your motion plus a short likeness note is saved with the clip. No credits are used while you edit this.</small></label>
                     <details className="provider-prompt-preview"><summary>View exact provider prompt</summary><p>{providerPromptPreview}</p></details>
-                    <div className="motion-duration"><span>PAID GENERATION LENGTH</span><div className="motion-duration-card"><strong>15s continuous motion</strong><small>{videoEstimateLabel} est. · one full generation · no repeated segment</small></div></div>
-                    <p className="motion-spend-note">Credits are used only when you press the generation button below.</p>
+                    <div className="motion-duration"><span>VIDEO CREDIT</span><div className="motion-duration-card"><strong>1 credit · 15s AI video</strong><small>{creditsRemaining === undefined ? "Loading balance…" : `${creditsRemaining} of ${props.videoCredits?.limit || 100} credits remaining`} · exports use no credits</small></div></div>
+                    <p className="motion-spend-note">Only generating a new AI video uses a video credit. Previewing, editing, exporting, and downloading do not.</p>
                   </div>
                 )}
-                <button className="button button--primary button--wide" disabled={!((assetKind === "image" ? imageDirection : motionPrompt).trim()) || props.busy === "image-asset" || props.busy === "video-asset" || (assetKind === "video" && (!videoAvailable || !props.videoPlan))}>{props.busy === `${assetKind}-asset` ? <LoaderCircle className="spin" size={15} /> : assetKind === "image" ? <ImageIcon size={15} /> : <FileVideo size={15} />}{assetKind === "image" ? "Generate image" : videoAvailable ? `Spend ${videoEstimateLabel} · generate ${videoDuration}s` : "Connect video provider"}</button>
+                <button className="button button--primary button--wide" disabled={!((assetKind === "image" ? imageDirection : motionPrompt).trim()) || props.busy === "image-asset" || props.busy === "video-asset" || (assetKind === "video" && (!videoAvailable || !canGenerateVideo))}>{props.busy === `${assetKind}-asset` ? <LoaderCircle className="spin" size={15} /> : assetKind === "image" ? <ImageIcon size={15} /> : <FileVideo size={15} />}{assetKind === "image" ? "Generate image" : !videoAvailable ? "Connect video provider" : creditsRemaining === undefined ? "Loading video credits…" : creditsRemaining < 1 ? "No video credits remaining" : `Use 1 video credit · generate ${videoDuration}s`}</button>
               </form>
             ) : null}
             <div className="asset-list">
-              {workspace.clips.map((clip) => <button key={clip.id} disabled={clip.status !== "ready"} title={clip.error} className={props.selectedAssetId === clip.id || selectedReel?.clipId === clip.id ? "is-selected" : ""} onClick={() => props.onSelectAsset(clip.id)}><div>{clip.videoUrl ? <video src={clip.videoUrl} muted playsInline loop={(clip.duration || 15) >= 15} /> : <img src={clip.posterUrl} alt="" />}{clip.status === "queued" || clip.status === "generating" ? <LoaderCircle className="spin" size={13} /> : clip.videoUrl ? <FileVideo size={13} /> : <ImageIcon size={13} />}</div><span>{clip.label}</span><small>{clip.status === "failed" ? "Generation failed" : clip.status === "queued" || clip.status === "generating" ? "Generating · safely saved" : clip.provider === "still" ? "$0 · subtle push-in" : clip.duration === 5 ? `${clip.provider} · legacy 5s · ending holds` : `${clip.provider} · 15s reusable motion`}</small></button>)}
+              {workspace.clips.map((clip) => <button key={clip.id} disabled={clip.status !== "ready"} title={clip.error} className={props.selectedAssetId === clip.id || selectedReel?.clipId === clip.id ? "is-selected" : ""} onClick={() => props.onSelectAsset(clip.id)}><div>{clip.videoUrl ? <video src={clip.videoUrl} muted playsInline loop={(clip.duration || 15) >= 15} /> : <img src={clip.posterUrl} alt="" />}{clip.status === "queued" || clip.status === "generating" ? <LoaderCircle className="spin" size={13} /> : clip.videoUrl ? <FileVideo size={13} /> : <ImageIcon size={13} />}</div><span>{clip.label}</span><small>{clip.status === "failed" ? "Generation failed · credit returned" : clip.status === "queued" || clip.status === "generating" ? "Generating · safely saved" : clip.provider === "still" ? "Still image · subtle push-in" : clip.duration === 5 ? `${clip.provider} · legacy 5s · ending holds` : `${clip.provider} · 15s reusable motion`}</small></button>)}
             </div>
             {props.activeClip ? (
               <div className="asset-prompt-card">
-                <div className="asset-prompt-head"><span>{props.activeClip.provider === "still" ? "MOTION RECIPE" : "EXACT VIDEO PROMPT"}</span><small>{props.activeClip.provider === "still" ? "$0 · local effect" : "Saved with this asset"}</small></div>
+                <div className="asset-prompt-head"><span>{props.activeClip.provider === "still" ? "MOTION RECIPE" : "EXACT VIDEO PROMPT"}</span><small>{props.activeClip.provider === "still" ? "Local effect · no video credit" : "Saved with this asset"}</small></div>
                 <p>{props.activeClip.generationPrompt || props.activeClip.motionPrompt}</p>
                 <div className="asset-prompt-source"><span>IDENTITY SOURCE</span><strong>{activeReference?.label || "Approved cast portrait"}</strong></div>
               </div>
             ) : null}
-            <button className="motion-note" onClick={() => { setAssetKind("video"); setAssetComposerOpen(true); }}><Plus size={14} /><div><strong>Plan motion before spending</strong><span>{videoAvailable ? `Choose and edit directions free · ${videoEstimateLabel} estimated for one reusable 15s clip.` : "Connect OpenRouter later; your image workflow works now."}</span></div></button>
+            <button className="motion-note" onClick={() => { setAssetKind("video"); setAssetComposerOpen(true); }}><Plus size={14} /><div><strong>Create reusable motion</strong><span>{videoAvailable ? `One AI video costs 1 video credit · ${creditsRemaining ?? "—"} remaining. Exports are included.` : "Connect OpenRouter later; your image workflow works now."}</span></div></button>
           </section>
 
           <section className="cast-preview-stage">
@@ -1399,7 +1411,7 @@ function CastStudio(props: CastStudioProps) {
                 <button className="button button--primary button--wide" onClick={props.onBuildReels} disabled={props.busy === "stories"}>{props.busy === "stories" ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} Write five personal stories</button>
               </div>
             )}
-            <div className="studio-health"><span><i className={props.capabilities?.openai ? "is-ready" : ""} /> Writing model</span><span><i className="is-ready" /> $0 still mode</span><span><i className={props.capabilities?.convex ? "is-ready" : ""} /> Cloud save</span></div>
+            <div className="studio-health"><span><i className={props.capabilities?.openai ? "is-ready" : ""} /> Writing model</span><span><i className="is-ready" /> Still mode included</span><span><i className={props.capabilities?.convex ? "is-ready" : ""} /> Cloud save</span></div>
           </section>
         </div>
       </main>

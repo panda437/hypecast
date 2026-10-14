@@ -92,7 +92,7 @@ export async function selectOpenRouterVideoOption() {
   const configured = process.env.OPENROUTER_VIDEO_MODEL;
   const selected = affordable.find((option) => option.id === configured) || affordable[0];
   if (!selected) {
-    throw new Error(`No compatible OpenRouter video model is available at or below $${cap.toFixed(2)} per second.`);
+    throw new Error("No compatible video model is available right now.");
   }
   return selected;
 }
