@@ -73,6 +73,23 @@ export type Reel = {
   style: "glass" | "clean" | "highlight";
 };
 
+export type StoryBatch = {
+  id: string;
+  createdAt: number;
+  reels: Reel[];
+};
+
+export type ExportRecord = {
+  id: string;
+  reelId: string;
+  title: string;
+  story: string;
+  clipId: string;
+  createdAt: number;
+  status: "downloaded" | "saved" | "failed";
+  url?: string;
+};
+
 export type AppCapabilities = {
   openai: boolean;
   fal: boolean;
@@ -84,6 +101,7 @@ export type AppCapabilities = {
 };
 
 export type WorkspaceSnapshot = {
+  clientProjectId: string;
   mode: "demo" | "live";
   step: number;
   productUrl: string;
@@ -93,5 +111,26 @@ export type WorkspaceSnapshot = {
   references: ReferenceImage[];
   clips: VideoClip[];
   reels: Reel[];
+  storyBatches: StoryBatch[];
+  activeBatchId?: string;
+  exports: ExportRecord[];
   updatedAt: number;
+};
+
+export type SavedProject = {
+  clientProjectId: string;
+  productName: string;
+  updatedAt: number;
+  snapshot: WorkspaceSnapshot;
+  source: "cloud" | "device";
+};
+
+export type PendingExport = {
+  id: string;
+  clientProjectId: string;
+  blob: Blob;
+  reelId: string;
+  title: string;
+  story: string;
+  createdAt: number;
 };

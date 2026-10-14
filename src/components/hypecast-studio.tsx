@@ -5,6 +5,8 @@ import {
   ArrowRight,
   Check,
   CircleAlert,
+  Clock3,
+  Cloud,
   Download,
   FileVideo,
   ImageIcon,
@@ -28,8 +30,11 @@ import type {
   AppCapabilities,
   CreatorCandidate,
   ProductBrief,
+  PendingExport,
   Reel,
   ReferenceImage,
+  SavedProject,
+  StoryBatch,
   VideoClip,
   WorkspaceSnapshot,
 } from "@/lib/types";
@@ -37,10 +42,12 @@ import { ReelPreview } from "@/components/reel-preview";
 import { CloudProjectSync } from "@/components/cloud-project-sync";
 
 const STORAGE_KEY = "hypecast-project-v2";
+const PROJECTS_STORAGE_KEY = "hypecast-project-history-v1";
 const REEL_DURATION = 15;
 const onboardingSteps = ["Product", "Direction", "Cast"];
 
 const emptyWorkspace: WorkspaceSnapshot = {
+  clientProjectId: "",
   mode: "demo",
   step: 0,
   productUrl: "",
@@ -48,6 +55,8 @@ const emptyWorkspace: WorkspaceSnapshot = {
   references: [],
   clips: [],
   reels: [],
+  storyBatches: [],
+  exports: [],
   updatedAt: Date.now(),
 };
 
@@ -57,6 +66,18 @@ const homepageReel = demoReels(homepageClips)[0];
 
 function pause(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function newId(prefix: string) {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+
+function newWorkspace(): WorkspaceSnapshot {
+  return { ...emptyWorkspace, clientProjectId: newId("project"), updatedAt: Date.now() };
+}
+
+function cloneReels(reels: Reel[]) {
+  return reels.map((reel) => ({ ...reel, cards: reel.cards.map((card) => ({ ...card })) }));
 }
 
 function stillClip(reference: ReferenceImage): VideoClip {
@@ -89,8 +110,27 @@ function normalizeWorkspace(saved: WorkspaceSnapshot): WorkspaceSnapshot {
       style: reel.style || "glass",
     } satisfies Reel;
   });
+  const batches = Array.isArray(saved.storyBatches) ? saved.storyBatches.map((batch) => ({
+    ...batch,
+    reels: cloneReels(batch.reels || []),
+  })) : [];
+  if (reels.length && batches.length === 0) {
+    batches.push({ id: "batch-imported", createdAt: saved.updatedAt || Date.now(), reels: cloneReels(reels) });
+  }
   const step = Number(saved.step) > 3 ? 3 : Math.max(0, Number(saved.step) || 0);
-  return { ...emptyWorkspace, ...saved, references, clips, reels, step, updatedAt: Date.now() };
+  return {
+    ...emptyWorkspace,
+    ...saved,
+    clientProjectId: saved.clientProjectId || newId("project"),
+    references,
+    clips,
+    reels,
+    storyBatches: batches,
+    activeBatchId: saved.activeBatchId || batches.at(-1)?.id,
+    exports: Array.isArray(saved.exports) ? saved.exports : [],
+    step,
+    updatedAt: saved.updatedAt || Date.now(),
+  };
 }
 
 export function HypecastStudio() {
@@ -103,14 +143,37 @@ export function HypecastStudio() {
   const [selectedReelId, setSelectedReelId] = useState("");
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [exportProgress, setExportProgress] = useState<Record<string, number>>({});
+  const [deviceProjects, setDeviceProjects] = useState<SavedProject[]>([]);
+  const [cloudProjects, setCloudProjects] = useState<SavedProject[]>([]);
+  const [pendingExports, setPendingExports] = useState<PendingExport[]>([]);
 
   useEffect(() => {
     const hydrateTimer = window.setTimeout(() => {
       try {
         const saved = window.localStorage.getItem(STORAGE_KEY);
-        if (saved) setWorkspace(normalizeWorkspace(JSON.parse(saved) as WorkspaceSnapshot));
+        if (saved) {
+          setWorkspace(normalizeWorkspace(JSON.parse(saved) as WorkspaceSnapshot));
+        } else {
+          setWorkspace(newWorkspace());
+        }
+        const history = window.localStorage.getItem(PROJECTS_STORAGE_KEY);
+        if (history) {
+          const snapshots = JSON.parse(history) as WorkspaceSnapshot[];
+          setDeviceProjects(snapshots.map((snapshot) => {
+            const normalized = normalizeWorkspace(snapshot);
+            return {
+              clientProjectId: normalized.clientProjectId,
+              productName: normalized.brief?.productName || "Untitled product",
+              updatedAt: normalized.updatedAt,
+              snapshot: normalized,
+              source: "device" as const,
+            };
+          }));
+        }
       } catch {
         window.localStorage.removeItem(STORAGE_KEY);
+        window.localStorage.removeItem(PROJECTS_STORAGE_KEY);
+        setWorkspace(newWorkspace());
       }
       setHydrated(true);
     }, 0);
@@ -121,12 +184,36 @@ export function HypecastStudio() {
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !workspace.clientProjectId) return;
     const timer = window.setTimeout(() => {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...workspace, updatedAt: Date.now() }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
+      setDeviceProjects((current) => {
+        const saved: SavedProject = {
+          clientProjectId: workspace.clientProjectId,
+          productName: workspace.brief?.productName || "Untitled product",
+          updatedAt: workspace.updatedAt,
+          snapshot: workspace,
+          source: "device",
+        };
+        const next = [saved, ...current.filter((project) => project.clientProjectId !== workspace.clientProjectId)]
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .slice(0, 20);
+        window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(next.map((project) => project.snapshot)));
+        return next;
+      });
     }, 250);
     return () => window.clearTimeout(timer);
   }, [hydrated, workspace]);
+
+  const savedProjects = useMemo(() => {
+    const merged = new Map<string, SavedProject>();
+    for (const project of deviceProjects) merged.set(project.clientProjectId, project);
+    for (const project of cloudProjects) {
+      const local = merged.get(project.clientProjectId);
+      if (!local || project.updatedAt >= local.updatedAt) merged.set(project.clientProjectId, project);
+    }
+    return [...merged.values()].sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [cloudProjects, deviceProjects]);
 
   const selectedCreator = useMemo(
     () => workspace.creators.find((creator) => creator.id === workspace.selectedCreatorId),
@@ -176,8 +263,35 @@ export function HypecastStudio() {
     });
   }, []);
 
+  const handleExportStored = useCallback((id: string, url: string) => {
+    setWorkspace((current) => ({
+      ...current,
+      exports: current.exports.map((item) => item.id === id ? { ...item, status: "saved", url } : item),
+      updatedAt: Date.now(),
+    }));
+    setPendingExports((current) => current.filter((item) => item.id !== id));
+  }, []);
+
+  const restoreWorkspace = useCallback((saved: WorkspaceSnapshot) => {
+    const restored = normalizeWorkspace(saved);
+    setWorkspace(restored);
+    setSelectedReelId(restored.reels[0]?.id || "");
+    setSelectedAssetId(restored.clips[0]?.id || "");
+    setError("");
+  }, []);
+
+  const handleCloudProjects = useCallback((projects: SavedProject[]) => {
+    setCloudProjects(projects);
+  }, []);
+
+  function openSavedProject(clientProjectId: string) {
+    const project = savedProjects.find((item) => item.clientProjectId === clientProjectId);
+    if (!project) return;
+    restoreWorkspace(project.snapshot);
+  }
+
   function resetProject() {
-    setWorkspace({ ...emptyWorkspace, updatedAt: Date.now() });
+    setWorkspace(newWorkspace());
     setSelectedReelId("");
     setSelectedAssetId("");
     setError("");
@@ -190,7 +304,7 @@ export function HypecastStudio() {
     setBusy("analyzing");
     try {
       const { brief } = await apiRequest<{ brief: ProductBrief }>("/api/analyze", { url: workspace.productUrl });
-      updateWorkspace({ mode: "live", brief, step: 1, creators: [], selectedCreatorId: undefined, references: [], clips: [], reels: [] });
+      updateWorkspace({ mode: "live", brief, step: 1, creators: [], selectedCreatorId: undefined, references: [], clips: [], reels: [], storyBatches: [], activeBatchId: undefined, exports: [] });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not analyze that page.");
     } finally {
@@ -209,6 +323,9 @@ export function HypecastStudio() {
       references: [],
       clips: [],
       reels: [],
+      storyBatches: [],
+      activeBatchId: undefined,
+      exports: [],
     });
     setSelectedReelId("");
     setSelectedAssetId("");
@@ -297,13 +414,13 @@ export function HypecastStudio() {
     setBusy("stories");
     setError("");
     try {
-      let reels: Reel[];
+      let draftReels: Reel[];
       if (workspace.mode === "demo") {
         await pause(420);
-        reels = demoReels([chosenClip]);
+        draftReels = demoReels([chosenClip]);
       } else {
         const { hooks } = await apiRequest<{ hooks: Array<{ title: string; angle: string; story: string }> }>("/api/hooks", workspace.brief);
-        reels = hooks.map((item, index) => ({
+        draftReels = hooks.map((item, index) => ({
           id: `reel-${index + 1}`,
           title: item.title,
           clipId: chosenClip.id,
@@ -313,7 +430,21 @@ export function HypecastStudio() {
           style: "glass",
         }));
       }
-      updateWorkspace({ reels, step: 3 });
+      const batchId = newId("batch");
+      const reels = draftReels.map((reel, index) => ({
+        ...reel,
+        id: `${batchId}-reel-${index + 1}`,
+        cards: reel.cards.map((card) => ({ ...card, id: `${batchId}-card-${index + 1}` })),
+      }));
+      const batch: StoryBatch = { id: batchId, createdAt: Date.now(), reels: cloneReels(reels) };
+      setWorkspace((current) => ({
+        ...current,
+        reels,
+        storyBatches: [...current.storyBatches, batch],
+        activeBatchId: batchId,
+        step: 3,
+        updatedAt: Date.now(),
+      }));
       setSelectedReelId(reels[0].id);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not write the story batch.");
@@ -326,6 +457,10 @@ export function HypecastStudio() {
     setWorkspace((current) => ({
       ...current,
       reels: current.reels.map((reel) => reel.id === reelId ? { ...reel, ...patch } : reel),
+      storyBatches: current.storyBatches.map((batch) => batch.id === current.activeBatchId ? {
+        ...batch,
+        reels: batch.reels.map((reel) => reel.id === reelId ? { ...reel, ...patch } : reel),
+      } : batch),
       updatedAt: Date.now(),
     }));
   }
@@ -342,13 +477,30 @@ export function HypecastStudio() {
     if (selectedReel) updateReel(selectedReel.id, { clipId });
   }
 
+  function chooseBatch(batchId: string) {
+    const batch = workspace.storyBatches.find((item) => item.id === batchId);
+    if (!batch) return;
+    const reels = cloneReels(batch.reels);
+    updateWorkspace({ activeBatchId: batchId, reels });
+    setSelectedReelId(reels[0]?.id || "");
+  }
+
   async function exportOne(reel: Reel) {
     const clip = workspace.clips.find((item) => item.id === reel.clipId);
     if (!clip) return;
     setError("");
     setExportProgress((current) => ({ ...current, [reel.id]: 1 }));
     try {
-      await exportReel(reel, clip, (progress) => setExportProgress((current) => ({ ...current, [reel.id]: progress })));
+      const blob = await exportReel(reel, clip, (progress) => setExportProgress((current) => ({ ...current, [reel.id]: progress })));
+      const createdAt = Date.now();
+      const id = newId("export");
+      const story = reel.cards[0]?.text || reel.hook;
+      setWorkspace((current) => ({
+        ...current,
+        exports: [{ id, reelId: reel.id, title: reel.title, story, clipId: reel.clipId, createdAt, status: "downloaded" }, ...current.exports],
+        updatedAt: Date.now(),
+      }));
+      setPendingExports((current) => [...current, { id, clientProjectId: workspace.clientProjectId, blob, reelId: reel.id, title: reel.title, story, createdAt }]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "This browser could not export the reel.");
       setExportProgress((current) => ({ ...current, [reel.id]: 0 }));
@@ -383,12 +535,15 @@ export function HypecastStudio() {
       error={error}
       exportProgress={exportProgress}
       capabilities={capabilities}
+      savedProjects={savedProjects}
       onDismissError={() => setError("")}
       onReset={resetProject}
+      onOpenProject={openSavedProject}
       onSelectReel={setSelectedReelId}
       onSelectAsset={chooseAsset}
       onUpdateStory={updateStory}
       onUpdateReel={updateReel}
+      onSelectBatch={chooseBatch}
       onBuildReels={buildReels}
       onExport={exportOne}
     />
@@ -398,8 +553,10 @@ export function HypecastStudio() {
       busy={busy}
       error={error}
       clerkEnabled={clerkEnabled}
+      savedProjects={savedProjects}
       onDismissError={() => setError("")}
       onReset={resetProject}
+      onOpenProject={openSavedProject}
       onAnalyze={analyzeProduct}
       onStartDemo={startDemo}
       onUpdateWorkspace={updateWorkspace}
@@ -412,7 +569,17 @@ export function HypecastStudio() {
 
   return (
     <>
-      {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL ? <CloudProjectSync workspace={workspace} onAssetStored={handleAssetStored} /> : null}
+      {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL ? (
+        <CloudProjectSync
+          workspace={workspace}
+          hydrated={hydrated}
+          pendingExports={pendingExports}
+          onAssetStored={handleAssetStored}
+          onExportStored={handleExportStored}
+          onRestore={restoreWorkspace}
+          onProjectsChanged={handleCloudProjects}
+        />
+      ) : null}
       {clerkEnabled ? (
         <>
           <Show when="signed-out">{workspace.step === 0 ? <MarketingHome clerkEnabled onStartDemo={startDemo} /> : experience}</Show>
@@ -490,11 +657,13 @@ function MarketingHome({ clerkEnabled, onStartDemo }: { clerkEnabled: boolean; o
 
 type OnboardingProps = {
   workspace: WorkspaceSnapshot;
+  savedProjects: SavedProject[];
   busy: string;
   error: string;
   clerkEnabled: boolean;
   onDismissError: () => void;
   onReset: () => void;
+  onOpenProject: (clientProjectId: string) => void;
   onAnalyze: (event: FormEvent<HTMLFormElement>) => void;
   onStartDemo: () => void;
   onUpdateWorkspace: (patch: Partial<WorkspaceSnapshot>) => void;
@@ -524,6 +693,16 @@ function CastOnboarding(props: OnboardingProps) {
             {onboardingSteps.map((label, index) => <button key={label} className={`${workspace.step === index ? "is-active" : ""} ${workspace.step > index ? "is-done" : ""}`} disabled={index > workspace.step} onClick={() => props.onUpdateWorkspace({ step: index })}><span>{workspace.step > index ? <Check size={14} /> : `0${index + 1}`}</span><strong>{label}</strong></button>)}
           </div>
           <div className="onboarding-budget"><strong>$0 first-run video spend</strong><span>The selected portrait becomes the first reusable background.</span></div>
+          {props.savedProjects.some((project) => project.clientProjectId !== workspace.clientProjectId && project.snapshot.step > 0) ? (
+            <div className="saved-projects saved-projects--onboarding">
+              <span>RECENT STUDIOS</span>
+              {props.savedProjects.filter((project) => project.clientProjectId !== workspace.clientProjectId && project.snapshot.step > 0).slice(0, 4).map((project) => (
+                <button key={project.clientProjectId} onClick={() => props.onOpenProject(project.clientProjectId)}>
+                  <strong>{project.productName}</strong><small>{project.source === "cloud" ? <Cloud size={10} /> : <Clock3 size={10} />}{new Date(project.updatedAt).toLocaleDateString()}</small>
+                </button>
+              ))}
+            </div>
+          ) : null}
         </aside>
 
         <section className="onboarding-content">
@@ -578,6 +757,7 @@ function CastOnboarding(props: OnboardingProps) {
 type CastStudioProps = {
   workspace: WorkspaceSnapshot;
   creator: CreatorCandidate;
+  savedProjects: SavedProject[];
   clerkEnabled: boolean;
   selectedReel?: Reel;
   selectedAssetId: string;
@@ -589,10 +769,12 @@ type CastStudioProps = {
   capabilities: (AppCapabilities & { openrouter?: boolean }) | null;
   onDismissError: () => void;
   onReset: () => void;
+  onOpenProject: (clientProjectId: string) => void;
   onSelectReel: (id: string) => void;
   onSelectAsset: (id: string) => void;
   onUpdateStory: (reel: Reel, text: string) => void;
   onUpdateReel: (id: string, patch: Partial<Reel>) => void;
+  onSelectBatch: (id: string) => void;
   onBuildReels: () => void;
   onExport: (reel: Reel) => void;
 };
@@ -612,11 +794,21 @@ function CastStudio(props: CastStudioProps) {
         <span className="cast-nav-label">WORKSPACE</span>
         <nav className="cast-nav"><a className="is-active" href="#cast-studio"><LayoutGrid size={16} /><span>Cast studio</span></a><a href="#cast-backgrounds"><Library size={16} /><span>Backgrounds</span><small>{workspace.clips.length}</small></a><a href="#cast-reels"><FileVideo size={16} /><span>Reels</span><small>{workspace.reels.length}</small></a></nav>
         <div className="cast-sidebar-project"><span>ACTIVE PROJECT</span><strong>{workspace.brief?.productName}</strong><button onClick={props.onReset}>Start another product</button></div>
+        {props.savedProjects.some((project) => project.clientProjectId !== workspace.clientProjectId && project.snapshot.step > 0) ? (
+          <div className="saved-projects">
+            <span>RECENT STUDIOS</span>
+            {props.savedProjects.filter((project) => project.clientProjectId !== workspace.clientProjectId && project.snapshot.step > 0).slice(0, 4).map((project) => (
+              <button key={project.clientProjectId} onClick={() => props.onOpenProject(project.clientProjectId)}>
+                <strong>{project.productName}</strong><small>{project.source === "cloud" ? <Cloud size={10} /> : <Clock3 size={10} />}{new Date(project.updatedAt).toLocaleDateString()}</small>
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="cast-sidebar-user">{props.clerkEnabled ? <Show when="signed-in"><UserButton /></Show> : null}<span>{props.clerkEnabled ? "Saved to your studio" : "Local demo project"}</span></div>
       </aside>
 
       <main className="cast-main">
-        <header className="cast-topbar"><div><span>CAST STUDIO / {creator.name.toUpperCase()}</span><h1>Make the next reel.</h1></div><div className="cast-topbar-status"><span className="signal signal--live" /> Autosaved</div></header>
+        <header className="cast-topbar"><div><span>CAST STUDIO / {creator.name.toUpperCase()}</span><h1>Make the next reel.</h1></div><div className="cast-topbar-status"><span className="signal signal--live" />{props.clerkEnabled ? <Show when="signed-in" fallback={<>Saved on this device</>}>Cloud autosave on</Show> : "Saved on this device"}</div></header>
         {props.error ? <Notice message={props.error} onDismiss={props.onDismissError} /> : null}
         <div className="cast-workbench" id="cast-studio">
           <section className="cast-assets-panel" id="cast-backgrounds">
@@ -639,6 +831,9 @@ function CastStudio(props: CastStudioProps) {
             <div className="story-panel-head"><div><span>STORY DESK</span><h2>{selectedReel ? selectedReel.title : "Write the first batch"}</h2></div><span className="draft-pill">{workspace.mode === "demo" ? "DEMO" : "AI DRAFT"}</span></div>
             {selectedReel ? (
               <>
+                {workspace.storyBatches.length ? (
+                  <label className="batch-picker"><span><Clock3 size={12} /> STORY HISTORY</span><select value={workspace.activeBatchId || ""} onChange={(event) => props.onSelectBatch(event.target.value)}>{workspace.storyBatches.map((batch, index) => <option key={batch.id} value={batch.id}>Batch {index + 1} · {new Date(batch.createdAt).toLocaleString()}</option>)}</select></label>
+                ) : null}
                 <div className="story-rule"><span>ONE TEXT · FULL DURATION</span><strong>00:00 — 00:15</strong></div>
                 <div className="story-copy-head">
                   <div><span>FINAL COPY</span><small>Ready to export as-is. Editing is optional.</small></div>
@@ -654,6 +849,9 @@ function CastStudio(props: CastStudioProps) {
                   <label><span>Treatment</span><select value={selectedReel.style} onChange={(event) => props.onUpdateReel(selectedReel.id, { style: event.target.value as Reel["style"] })}><option value="glass">Smoked glass</option><option value="clean">Clean outline</option><option value="highlight">Hype orange</option></select></label>
                 </div>
                 <div className="story-actions"><button className="button" onClick={props.onBuildReels} disabled={props.busy === "stories"}>{props.busy === "stories" ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />} Rewrite batch</button><button className="button button--primary" onClick={() => props.onExport(selectedReel)} disabled={exporting}>{exporting ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}{exporting ? `Encoding ${props.exportProgress[selectedReel.id]}%` : "Export MP4"}</button></div>
+                {workspace.exports.length ? (
+                  <div className="export-history"><span>EXPORT HISTORY · {workspace.exports.length}</span>{workspace.exports.slice(0, 3).map((item) => item.url ? <a key={item.id} href={item.url} target="_blank" rel="noreferrer"><FileVideo size={12} /><strong>{item.title}</strong><small>Cloud copy</small></a> : <div key={item.id}><Download size={12} /><strong>{item.title}</strong><small>Downloaded · saves after sign-in</small></div>)}</div>
+                ) : null}
               </>
             ) : (
               <div className="story-empty">

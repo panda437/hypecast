@@ -359,6 +359,13 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .onboarding-budget strong, .onboarding-budget span { display: block; }
 .onboarding-budget strong { color: var(--acid); font-size: 11px; }
 .onboarding-budget span { color: var(--dim); font-size: 9px; line-height: 1.45; margin-top: 5px; }
+.saved-projects { display: grid; gap: 5px; margin-top: 10px; }
+.saved-projects > span { margin: 3px 4px; color: var(--dim); font: 650 7px/1 var(--font-mono); letter-spacing: .12em; }
+.saved-projects > button { display: grid; gap: 4px; padding: 9px; border: 1px solid var(--line-soft); border-radius: 7px; background: #11110f; color: var(--ink); text-align: left; cursor: pointer; }
+.saved-projects > button:hover { border-color: var(--line); background: #171614; }
+.saved-projects > button strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+.saved-projects > button small { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 7px; }
+.saved-projects--onboarding { margin-top: 12px; }
 .onboarding-content { min-width: 0; padding: 64px clamp(28px, 6vw, 88px) 90px; }
 .onboarding-stage { width: min(100%, 780px); margin: 0 auto; }
 .onboarding-stage--narrow { width: min(100%, 640px); padding-top: 6vh; }
@@ -450,6 +457,9 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .story-panel-head { display: flex; justify-content: space-between; gap: 12px; }
 .story-panel-head h2 { margin: 7px 0 0; font-size: 22px; letter-spacing: -.03em; }
 .draft-pill { height: fit-content; padding: 5px 7px; border: 1px solid var(--line); border-radius: 999px; color: var(--accent-light) !important; }
+.batch-picker { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; margin-top: 16px; }
+.batch-picker > span { display: flex; align-items: center; gap: 5px; color: var(--dim); font: 650 7px/1 var(--font-mono); letter-spacing: .1em; }
+.batch-picker select { min-width: 0; width: 100%; padding: 7px 8px; color: var(--muted); font-size: 8px; }
 .story-rule { margin: 22px 0 12px; padding: 10px; border: 1px solid rgba(182,243,107,.14); border-radius: 7px; background: rgba(182,243,107,.03); display: flex; justify-content: space-between; color: var(--acid); font: 650 8px/1 var(--font-mono); }
 .story-copy-head { min-height: 40px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .story-copy-head > div span, .story-copy-head > div small { display: block; }
@@ -467,6 +477,12 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .story-controls label { display: grid; gap: 6px; }
 .story-controls select { width: 100%; padding: 9px; font-size: 9px; }
 .story-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 14px; }
+.export-history { display: grid; gap: 5px; margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.export-history > span { margin-bottom: 2px; color: var(--dim); font: 650 7px/1 var(--font-mono); letter-spacing: .1em; }
+.export-history > a, .export-history > div { min-width: 0; display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 6px; padding: 7px 8px; border: 1px solid var(--line-soft); border-radius: 6px; color: var(--muted); text-decoration: none; }
+.export-history > a:hover { border-color: var(--accent); }
+.export-history strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; }
+.export-history small { color: var(--dim); font-size: 7px; }
 .story-empty { margin-top: 30px; }
 .story-empty > p { color: var(--muted); font-size: 11px; line-height: 1.55; }
 .story-structure { border-top: 1px solid var(--line); margin-bottom: 22px; }
@@ -505,7 +521,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
   .onboarding-cast-grid { grid-template-columns: repeat(3,1fr); }
   .cast-shell { display: block; }
   .cast-sidebar { position: static; width: 100%; height: auto; padding: 14px 18px; flex-direction: row; align-items: center; gap: 20px; border-right: 0; border-bottom: 1px solid var(--line-soft); }
-  .cast-nav-label, .cast-sidebar-project, .cast-sidebar-user { display: none; }
+  .cast-nav-label, .cast-sidebar-project, .cast-sidebar-user, .cast-sidebar .saved-projects { display: none; }
   .cast-nav { margin-left: auto; display: flex; }
   .cast-nav a { min-width: 42px; grid-template-columns: 18px; }
   .cast-nav a span, .cast-nav a small { display: none; }

@@ -144,8 +144,10 @@ The existing OpenRouter adapter discovers compatible models dynamically and supp
 
 ### Data
 
-- Convex stores ownership, project snapshots, approved decisions, generated assets, background-library entries, jobs, reels, and edit state.
+- Convex stores ownership, separate project snapshots, approved decisions, generated assets, background-library entries, versioned story batches, export records, jobs, reels, and edit state.
 - Inline generated images are uploaded to storage for resumability after authentication is configured.
+- Returning signed-in users restore the latest cloud project and can reopen earlier studios; device storage remains a signed-out fallback.
+- A completed MP4 downloads immediately, then uploads to the project’s Convex asset library without blocking the download.
 
 ### Export
 
@@ -185,6 +187,8 @@ The first-run MVP is accepted only if a user can:
 9. Preview the same approved portrait behind every reel.
 10. Download five silent MP4 files matching the current edits.
 11. Reload and resume without losing approved decisions.
+12. Rewrite a batch without erasing earlier scripts, then reopen either batch later.
+13. Start another product without overwriting the previous cast, backgrounds, reels, or export records.
 
 Technical acceptance also requires:
 

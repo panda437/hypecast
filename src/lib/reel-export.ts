@@ -100,8 +100,7 @@ async function imageFromUrl(url: string) {
   return image;
 }
 
-function download(buffer: ArrayBuffer, reel: Reel) {
-  const blob = new Blob([buffer], { type: "video/mp4" });
+function download(blob: Blob, reel: Reel) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -174,6 +173,8 @@ export async function exportReel(reel: Reel, clip: VideoClip, onProgress: (progr
 
   const buffer = output.target.buffer;
   if (!buffer) throw new Error("The browser encoder returned no MP4 data.");
+  const blob = new Blob([buffer], { type: "video/mp4" });
   onProgress(100);
-  download(buffer, reel);
+  download(blob, reel);
+  return blob;
 }
