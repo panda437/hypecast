@@ -121,6 +121,8 @@ function reelsFromHooks(
     cards: [{ id: `reel-${index + 1}-story`, text: item.story, start: 0, end: REEL_DURATION }],
     position: "center" as const,
     style: "glass" as const,
+    fontFamily: "sans" as const,
+    fontSize: "medium" as const,
   }));
 }
 
@@ -158,11 +160,17 @@ function normalizeWorkspace(saved: WorkspaceSnapshot): WorkspaceSnapshot {
       cards: [{ id: `${reel.id}-story`, text: story, start: 0, end: REEL_DURATION }],
       position: reel.position || "center",
       style: reel.style || "glass",
+      fontFamily: reel.fontFamily || "sans",
+      fontSize: reel.fontSize || "medium",
     } satisfies Reel;
   });
   const batches = Array.isArray(saved.storyBatches) ? saved.storyBatches.map((batch) => ({
     ...batch,
-    reels: cloneReels(batch.reels || []),
+    reels: cloneReels(batch.reels || []).map((reel) => ({
+      ...reel,
+      fontFamily: reel.fontFamily || "sans",
+      fontSize: reel.fontSize || "medium",
+    })),
   })) : [];
   if (reels.length && batches.length === 0) {
     batches.push({ id: "batch-imported", createdAt: saved.updatedAt || Date.now(), reels: cloneReels(reels) });
@@ -808,6 +816,8 @@ export function HypecastStudio() {
     }],
     position: "center",
     style: "glass",
+    fontFamily: "sans",
+    fontSize: "medium",
   } satisfies Reel) : undefined);
 
   const experience = workspace.step === 3 && selectedCreator ? (
@@ -1200,6 +1210,8 @@ function CastStudio(props: CastStudioProps) {
                   <div className="story-review"><p>{story}</p><small className={wordCount < 35 || wordCount > 55 ? "is-warning" : ""}>{wordCount} words · target 35–55 · product facts should be checked before posting</small></div>
                 )}
                 <div className="story-controls">
+                  <label><span>Font</span><select aria-label="Reel font" value={selectedReel.fontFamily} onChange={(event) => props.onUpdateReel(selectedReel.id, { fontFamily: event.target.value as Reel["fontFamily"] })}><option value="sans">Clean sans</option><option value="serif">Editorial serif</option><option value="mono">Typewriter mono</option></select></label>
+                  <label><span>Text size</span><select aria-label="Reel text size" value={selectedReel.fontSize} onChange={(event) => props.onUpdateReel(selectedReel.id, { fontSize: event.target.value as Reel["fontSize"] })}><option value="small">Compact</option><option value="medium">Standard</option><option value="large">Large</option></select></label>
                   <label><span>Placement</span><select value={selectedReel.position} onChange={(event) => props.onUpdateReel(selectedReel.id, { position: event.target.value as Reel["position"] })}><option value="top">Top safe zone</option><option value="center">Center</option><option value="bottom">Bottom safe zone</option></select></label>
                   <label><span>Treatment</span><select value={selectedReel.style} onChange={(event) => props.onUpdateReel(selectedReel.id, { style: event.target.value as Reel["style"] })}><option value="glass">Smoked glass</option><option value="clean">Clean outline</option><option value="highlight">Hype orange</option></select></label>
                 </div>

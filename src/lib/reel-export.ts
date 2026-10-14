@@ -33,12 +33,19 @@ function drawOverlay(ctx: CanvasRenderingContext2D, reel: Reel, time: number) {
   const card = reel.cards.find((item) => time >= item.start && time < item.end) || reel.cards[0];
   if (!card) return;
   const isStory = card.text.length > 180;
-  let fontSize = isStory ? 34 : card.text.length > 92 ? 48 : card.text.length > 58 ? 56 : 66;
+  const sizeScale = reel.fontSize === "small" ? 0.82 : reel.fontSize === "large" ? 1.18 : 1;
+  const fontFamily = reel.fontFamily === "serif"
+    ? "Georgia, 'Times New Roman', serif"
+    : reel.fontFamily === "mono"
+      ? "'Geist Mono', 'Courier New', monospace"
+      : "Geist, Arial, Helvetica, sans-serif";
+  const fontWeight = reel.fontFamily === "mono" ? 700 : isStory ? 650 : reel.fontFamily === "serif" ? 700 : 800;
+  let fontSize = Math.round((isStory ? 34 : card.text.length > 92 ? 48 : card.text.length > 58 ? 56 : 66) * sizeScale);
   let lines: string[] = [];
   const maxWidth = WIDTH - 132;
   const maxHeight = 880;
   do {
-    ctx.font = `${isStory ? 650 : 800} ${fontSize}px Arial, sans-serif`;
+    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
     lines = wrapText(ctx, card.text, maxWidth);
     if (lines.length * fontSize * (isStory ? 1.24 : 1.1) <= maxHeight) break;
     fontSize -= 2;

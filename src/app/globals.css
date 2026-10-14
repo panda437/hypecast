@@ -211,6 +211,11 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .reel-copy--top { top: 18%; }
 .reel-copy--center { top: 48%; transform: translateY(-50%); }
 .reel-copy--bottom { bottom: 20%; }
+.reel-copy--size-small { font-size: clamp(15px, 1.72vw, 21px); }
+.reel-copy--size-large { font-size: clamp(21px, 2.48vw, 31px); }
+.reel-copy--font-sans { font-family: var(--font-sans); }
+.reel-copy--font-serif { font-family: Georgia, "Times New Roman", serif; letter-spacing: -.032em; font-weight: 700; }
+.reel-copy--font-mono { font-family: var(--font-mono); letter-spacing: -.035em; font-weight: 700; }
 .reel-copy--glass { padding: 12px 10px; border-radius: 10px; background: rgba(7,7,7,.62); backdrop-filter: blur(9px); }
 .reel-copy--clean { text-shadow: 0 2px 1px #000, 0 0 5px #000, 0 0 14px #000; }
 .reel-copy--highlight { padding: 10px 8px; border-radius: 7px; background: var(--accent); color: #180804; }
@@ -547,8 +552,12 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 
 /* Long static-story treatment */
 .reel-copy { white-space: pre-wrap; }
-.reel-copy--medium { text-align: left; font-size: clamp(12px, 1.25vw, 15px); line-height: 1.2; letter-spacing: -.018em; font-weight: 680; text-wrap: pretty; }
-.reel-copy--long { text-align: left; font-size: clamp(9px, 1vw, 12px); line-height: 1.25; letter-spacing: -.012em; font-weight: 650; text-wrap: pretty; }
+.reel-copy--copy-medium { text-align: left; font-size: clamp(12px, 1.25vw, 15px); line-height: 1.2; letter-spacing: -.018em; font-weight: 680; text-wrap: pretty; }
+.reel-copy--copy-medium.reel-copy--size-small { font-size: clamp(10px, 1.03vw, 12px); }
+.reel-copy--copy-medium.reel-copy--size-large { font-size: clamp(14px, 1.48vw, 18px); }
+.reel-copy--copy-long { text-align: left; font-size: clamp(9px, 1vw, 12px); line-height: 1.25; letter-spacing: -.012em; font-weight: 650; text-wrap: pretty; }
+.reel-copy--copy-long.reel-copy--size-small { font-size: clamp(8px, .82vw, 10px); }
+.reel-copy--copy-long.reel-copy--size-large { font-size: clamp(11px, 1.18vw, 14px); }
 
 @media (max-width: 1260px) {
   .home-hero { grid-template-columns: .9fr 1.1fr; gap: 40px; }

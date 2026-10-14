@@ -128,5 +128,7 @@ export function demoReels(clips: VideoClip[], brief?: ProductBrief): Reel[] {
     cards: [{ id: `card-${index + 1}`, text: story, start: 0, end: 15 }],
     position: "center",
     style: "glass",
+    fontFamily: "sans",
+    fontSize: "medium",
   }));
 }

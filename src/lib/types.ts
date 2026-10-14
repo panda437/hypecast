@@ -66,6 +66,9 @@ export type TextCard = {
   end: number;
 };
 
+export type ReelFont = "sans" | "serif" | "mono";
+export type ReelTextSize = "small" | "medium" | "large";
+
 export type Reel = {
   id: string;
   title: string;
@@ -74,6 +77,8 @@ export type Reel = {
   cards: TextCard[];
   position: "top" | "center" | "bottom";
   style: "glass" | "clean" | "highlight";
+  fontFamily: ReelFont;
+  fontSize: ReelTextSize;
 };
 
 export type StoryBatch = {

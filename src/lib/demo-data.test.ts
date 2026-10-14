@@ -19,6 +19,7 @@ describe("the zero-credit Hypecast flow", () => {
     expect(reels.every((reel) => clips.some((clip) => clip.id === reel.clipId))).toBe(true);
     expect(reels.every((reel) => reel.cards.length === 1)).toBe(true);
     expect(reels.every((reel) => reel.cards.every((card) => card.start === 0 && card.end === 15))).toBe(true);
+    expect(reels.every((reel) => reel.fontFamily === "sans" && reel.fontSize === "medium")).toBe(true);
   });
 
   it("keeps the demo personal and the product incidental", () => {

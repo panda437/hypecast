@@ -25,6 +25,12 @@ export function ReelPreview({ reel, clip, compact = false }: ReelPreviewProps) {
     return reel.cards.find((card) => time >= card.start && time < card.end) || reel.cards[0];
   }, [reel, time]);
 
+  const copyLengthClass = activeCard && activeCard.text.length > 420
+    ? "reel-copy--copy-long"
+    : activeCard && activeCard.text.length > 220
+      ? "reel-copy--copy-medium"
+      : "";
+
   return (
     <div className={`reel-frame ${compact ? "reel-frame--compact" : ""}`} aria-label="Vertical reel preview">
       <div className="reel-media">
@@ -53,7 +59,7 @@ export function ReelPreview({ reel, clip, compact = false }: ReelPreviewProps) {
       </div>
       <div className="safe-zone" aria-hidden="true" />
       {activeCard ? (
-        <div className={`reel-copy reel-copy--${reel?.position || "center"} reel-copy--${reel?.style || "glass"} ${activeCard.text.length > 420 ? "reel-copy--long" : activeCard.text.length > 220 ? "reel-copy--medium" : ""}`}>
+        <div className={`reel-copy reel-copy--${reel?.position || "center"} reel-copy--${reel?.style || "glass"} reel-copy--font-${reel?.fontFamily || "sans"} reel-copy--size-${reel?.fontSize || "medium"} ${copyLengthClass}`}>
           {activeCard.text}
         </div>
       ) : null}
