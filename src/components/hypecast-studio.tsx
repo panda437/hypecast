@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import {
+  ArrowLeft,
   ArrowRight,
   Check,
   CircleAlert,
@@ -80,10 +81,10 @@ function cloneReels(reels: Reel[]) {
   return reels.map((reel) => ({ ...reel, cards: reel.cards.map((card) => ({ ...card })) }));
 }
 
-function stillClip(reference: ReferenceImage): VideoClip {
+function stillClip(reference: ReferenceImage, id = "clip-still", label = "Creator portrait · 15s"): VideoClip {
   return {
-    id: "clip-still",
-    label: "Creator portrait · 15s",
+    id,
+    label,
     motionPrompt: "A gentle local push-in gives the still subtle motion without a video-generation call.",
     referenceImageId: reference.id,
     provider: "still",
@@ -94,8 +95,12 @@ function stillClip(reference: ReferenceImage): VideoClip {
 
 function normalizeWorkspace(saved: WorkspaceSnapshot): WorkspaceSnapshot {
   const references = Array.isArray(saved.references) ? saved.references : [];
-  let clips = Array.isArray(saved.clips)
-    ? saved.clips.map((clip) => ({ ...clip, label: clip.label.replace("17s", "15s") }))
+  let clips: VideoClip[] = Array.isArray(saved.clips)
+    ? saved.clips.map((clip) => ({
+        ...clip,
+        label: clip.label.replace("17s", "15s"),
+        storageStatus: clip.storageStatus || (clip.videoUrl && !clip.videoUrl.startsWith("/api/") ? "stored" as const : undefined),
+      }))
     : [];
   if (saved.selectedCreatorId && clips.length === 0 && references[0]?.imageDataUrl) {
     clips = [stillClip(references[0])];
@@ -127,6 +132,7 @@ function normalizeWorkspace(saved: WorkspaceSnapshot): WorkspaceSnapshot {
     reels,
     storyBatches: batches,
     activeBatchId: saved.activeBatchId || batches.at(-1)?.id,
+    activeCastId: saved.activeCastId || (step === 3 ? saved.selectedCreatorId : undefined),
     exports: Array.isArray(saved.exports) ? saved.exports : [],
     step,
     updatedAt: saved.updatedAt || Date.now(),
@@ -146,6 +152,11 @@ export function HypecastStudio() {
   const [deviceProjects, setDeviceProjects] = useState<SavedProject[]>([]);
   const [cloudProjects, setCloudProjects] = useState<SavedProject[]>([]);
   const [pendingExports, setPendingExports] = useState<PendingExport[]>([]);
+  const pendingVideoJobKey = useMemo(() => JSON.stringify(
+    workspace.clips
+      .filter((clip) => clip.requestId && (clip.status === "queued" || clip.status === "generating"))
+      .map((clip) => ({ id: clip.id, requestId: clip.requestId as string })),
+  ), [workspace.clips]);
 
   useEffect(() => {
     const hydrateTimer = window.setTimeout(() => {
@@ -186,7 +197,11 @@ export function HypecastStudio() {
   useEffect(() => {
     if (!hydrated || !workspace.clientProjectId) return;
     const timer = window.setTimeout(() => {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
+      } catch {
+        // Large live images are moved to Convex; the cloud copy remains authoritative.
+      }
       setDeviceProjects((current) => {
         const saved: SavedProject = {
           clientProjectId: workspace.clientProjectId,
@@ -198,12 +213,51 @@ export function HypecastStudio() {
         const next = [saved, ...current.filter((project) => project.clientProjectId !== workspace.clientProjectId)]
           .sort((a, b) => b.updatedAt - a.updatedAt)
           .slice(0, 20);
-        window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(next.map((project) => project.snapshot)));
+        try {
+          window.localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(next.map((project) => project.snapshot)));
+        } catch {
+          // Keep the in-memory history while cloud storage replaces inline media.
+        }
         return next;
       });
     }, 250);
     return () => window.clearTimeout(timer);
   }, [hydrated, workspace]);
+
+  useEffect(() => {
+    const pendingVideoJobs = JSON.parse(pendingVideoJobKey) as Array<{ id: string; requestId: string }>;
+    if (!hydrated || pendingVideoJobs.length === 0) return;
+    let cancelled = false;
+    let checking = false;
+
+    const checkJobs = async () => {
+      if (checking) return;
+      checking = true;
+      await Promise.allSettled(pendingVideoJobs.map(async (clip) => {
+        const result = await apiRequest<VideoClip>("/api/video/status", { requestId: clip.requestId });
+        if (cancelled) return;
+        setWorkspace((current) => ({
+          ...current,
+          clips: current.clips.map((item) => item.id === clip.id ? {
+            ...item,
+            status: result.status,
+            videoUrl: result.videoUrl || item.videoUrl,
+            storageStatus: result.status === "ready" ? "pending" : item.storageStatus,
+            error: result.error,
+          } : item),
+          updatedAt: Date.now(),
+        }));
+      }));
+      checking = false;
+    };
+
+    void checkJobs();
+    const timer = window.setInterval(() => void checkJobs(), 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [hydrated, pendingVideoJobKey]);
 
   const savedProjects = useMemo(() => {
     const merged = new Map<string, SavedProject>();
@@ -272,6 +326,14 @@ export function HypecastStudio() {
     setPendingExports((current) => current.filter((item) => item.id !== id));
   }, []);
 
+  const handleClipStored = useCallback((id: string, url: string) => {
+    setWorkspace((current) => ({
+      ...current,
+      clips: current.clips.map((clip) => clip.id === id ? { ...clip, videoUrl: url, storageStatus: "stored" } : clip),
+      updatedAt: Date.now(),
+    }));
+  }, []);
+
   const restoreWorkspace = useCallback((saved: WorkspaceSnapshot) => {
     const restored = normalizeWorkspace(saved);
     setWorkspace(restored);
@@ -304,7 +366,7 @@ export function HypecastStudio() {
     setBusy("analyzing");
     try {
       const { brief } = await apiRequest<{ brief: ProductBrief }>("/api/analyze", { url: workspace.productUrl });
-      updateWorkspace({ mode: "live", brief, step: 1, creators: [], selectedCreatorId: undefined, references: [], clips: [], reels: [], storyBatches: [], activeBatchId: undefined, exports: [] });
+      updateWorkspace({ mode: "live", brief, step: 1, creators: [], selectedCreatorId: undefined, activeCastId: undefined, references: [], clips: [], reels: [], storyBatches: [], activeBatchId: undefined, exports: [] });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not analyze that page.");
     } finally {
@@ -320,6 +382,7 @@ export function HypecastStudio() {
       step: 1,
       creators: [],
       selectedCreatorId: undefined,
+      activeCastId: undefined,
       references: [],
       clips: [],
       reels: [],
@@ -388,6 +451,13 @@ export function HypecastStudio() {
       setError("Choose a creator with a finished portrait first.");
       return;
     }
+    if (workspace.activeCastId === selectedCreator.id && workspace.clips.length) {
+      setSelectedAssetId((current) => current || workspace.clips[0].id);
+      updateWorkspace({ step: 3 });
+      setError("");
+      return;
+    }
+
     const references = workspace.mode === "demo"
       ? demoReferences(selectedCreator)
       : [{
@@ -399,8 +469,168 @@ export function HypecastStudio() {
         }];
     const clips = workspace.mode === "demo" ? demoClips(references) : [stillClip(references[0])];
     setSelectedAssetId(clips[0].id);
-    updateWorkspace({ references, clips, reels: [], step: 3 });
+    setSelectedReelId("");
+    setWorkspace((current) => ({
+      ...current,
+      clientProjectId: current.activeCastId && current.activeCastId !== selectedCreator.id ? newId("project") : current.clientProjectId,
+      activeCastId: selectedCreator.id,
+      references,
+      clips,
+      reels: [],
+      storyBatches: [],
+      activeBatchId: undefined,
+      exports: [],
+      step: 3,
+      updatedAt: Date.now(),
+    }));
     setError("");
+  }
+
+  async function generateCastImage(direction: string) {
+    if (!selectedCreator?.imageDataUrl) {
+      setError("The approved cast portrait is missing. Go back and choose the cast again.");
+      return false;
+    }
+    const assetNumber = workspace.references.length + 1;
+    const referenceId = newId("reference");
+    const clipId = newId("still");
+    const reference: ReferenceImage = {
+      id: referenceId,
+      label: `Cast image ${assetNumber}`,
+      direction,
+      status: "generating",
+    };
+    const clip: VideoClip = {
+      ...stillClip(reference, clipId, `Cast image ${assetNumber} · 15s`),
+      status: "generating",
+      posterUrl: selectedCreator.imageDataUrl,
+    };
+
+    setBusy("image-asset");
+    setError("");
+    const queuedWorkspace: WorkspaceSnapshot = {
+      ...workspace,
+      references: [...workspace.references, reference],
+      clips: [...workspace.clips, clip],
+      updatedAt: Date.now(),
+    };
+    setWorkspace(queuedWorkspace);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(queuedWorkspace));
+    } catch {
+      // Cloud autosave remains the durable path when browser storage is full.
+    }
+    try {
+      let imageDataUrl = selectedCreator.imageDataUrl;
+      if (workspace.mode === "demo") {
+        await pause(500);
+      } else {
+        const result = await apiRequest<{ imageDataUrl: string }>("/api/image", {
+          kind: "reference",
+          name: selectedCreator.name,
+          characterBible: selectedCreator.characterBible,
+          direction,
+          sourceDataUrl: selectedCreator.imageDataUrl,
+        });
+        imageDataUrl = result.imageDataUrl;
+      }
+      setWorkspace((current) => ({
+        ...current,
+        references: current.references.map((item) => item.id === referenceId ? { ...item, imageDataUrl, status: "ready" } : item),
+        clips: current.clips.map((item) => item.id === clipId ? { ...item, posterUrl: imageDataUrl, status: "ready" } : item),
+        updatedAt: Date.now(),
+      }));
+      setSelectedAssetId(clipId);
+      if (selectedReel) updateReel(selectedReel.id, { clipId });
+      return true;
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Could not generate the new cast image.";
+      setWorkspace((current) => ({
+        ...current,
+        references: current.references.map((item) => item.id === referenceId ? { ...item, status: "failed" } : item),
+        clips: current.clips.map((item) => item.id === clipId ? { ...item, status: "failed", error: message } : item),
+        updatedAt: Date.now(),
+      }));
+      setError(message);
+      return false;
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function generateCastVideo(motionPrompt: string) {
+    const sourceClip = workspace.clips.find((clip) => clip.id === selectedAssetId) || workspace.clips[0];
+    const reference = workspace.references.find((item) => item.id === sourceClip?.referenceImageId) || workspace.references.find((item) => item.status === "ready");
+    if (!reference?.imageDataUrl) {
+      setError("Choose a finished cast image before adding motion.");
+      return false;
+    }
+    if (!capabilities?.openrouter && !capabilities?.fal) {
+      setError("Video generation is not connected yet. Add an OpenRouter or fal key when you are ready for run two.");
+      return false;
+    }
+
+    const clipId = newId("video");
+    const provider = capabilities.openrouter ? "openrouter" as const : "fal" as const;
+    const clip: VideoClip = {
+      id: clipId,
+      label: `Motion clip ${workspace.clips.filter((item) => item.videoUrl || item.requestId).length + 1} · 15s`,
+      motionPrompt,
+      referenceImageId: reference.id,
+      provider,
+      status: "queued",
+      posterUrl: reference.imageDataUrl,
+    };
+    setBusy("video-asset");
+    setError("");
+    const queuedWorkspace: WorkspaceSnapshot = {
+      ...workspace,
+      clips: [...workspace.clips, clip],
+      updatedAt: Date.now(),
+    };
+    setWorkspace(queuedWorkspace);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(queuedWorkspace));
+    } catch {
+      // Cloud autosave remains the durable path when browser storage is full.
+    }
+    setSelectedAssetId(clipId);
+    try {
+      const result = await apiRequest<{
+        requestId: string;
+        status: VideoClip["status"];
+        generationPrompt?: string;
+        videoUrl?: string;
+      }>("/api/video/submit", {
+        prompt: motionPrompt,
+        startImageUrl: reference.imageDataUrl,
+        referenceImageUrls: [reference.imageDataUrl],
+      });
+      setWorkspace((current) => ({
+        ...current,
+        clips: current.clips.map((item) => item.id === clipId ? {
+          ...item,
+          requestId: result.requestId,
+          status: result.status,
+          generationPrompt: result.generationPrompt,
+          videoUrl: result.videoUrl,
+          storageStatus: result.status === "ready" ? "pending" : undefined,
+        } : item),
+        updatedAt: Date.now(),
+      }));
+      return true;
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Could not start the video generation.";
+      setWorkspace((current) => ({
+        ...current,
+        clips: current.clips.map((item) => item.id === clipId ? { ...item, status: "failed", error: message } : item),
+        updatedAt: Date.now(),
+      }));
+      setError(message);
+      return false;
+    } finally {
+      setBusy("");
+    }
   }
 
   async function buildReels() {
@@ -537,6 +767,7 @@ export function HypecastStudio() {
       savedProjects={savedProjects}
       onDismissError={() => setError("")}
       onReset={resetProject}
+      onChangeCast={() => updateWorkspace({ step: 2 })}
       onOpenProject={openSavedProject}
       onSelectReel={setSelectedReelId}
       onSelectAsset={chooseAsset}
@@ -544,6 +775,8 @@ export function HypecastStudio() {
       onUpdateReel={updateReel}
       onSelectBatch={chooseBatch}
       onBuildReels={buildReels}
+      onGenerateImage={generateCastImage}
+      onGenerateVideo={generateCastVideo}
       onExport={exportOne}
     />
   ) : (
@@ -574,6 +807,7 @@ export function HypecastStudio() {
           hydrated={hydrated}
           pendingExports={pendingExports}
           onAssetStored={handleAssetStored}
+          onClipStored={handleClipStored}
           onExportStored={handleExportStored}
           onRestore={restoreWorkspace}
           onProjectsChanged={handleCloudProjects}
@@ -768,6 +1002,7 @@ type CastStudioProps = {
   capabilities: (AppCapabilities & { openrouter?: boolean }) | null;
   onDismissError: () => void;
   onReset: () => void;
+  onChangeCast: () => void;
   onOpenProject: (clientProjectId: string) => void;
   onSelectReel: (id: string) => void;
   onSelectAsset: (id: string) => void;
@@ -775,17 +1010,32 @@ type CastStudioProps = {
   onUpdateReel: (id: string, patch: Partial<Reel>) => void;
   onSelectBatch: (id: string) => void;
   onBuildReels: () => void;
+  onGenerateImage: (direction: string) => Promise<boolean>;
+  onGenerateVideo: (motionPrompt: string) => Promise<boolean>;
   onExport: (reel: Reel) => void;
 };
 
 function CastStudio(props: CastStudioProps) {
   const { workspace, creator, selectedReel } = props;
   const [editingReelId, setEditingReelId] = useState<string | null>(null);
+  const [assetComposerOpen, setAssetComposerOpen] = useState(false);
+  const [assetKind, setAssetKind] = useState<"image" | "video">("image");
+  const [imageDirection, setImageDirection] = useState("Front-facing waist-up portrait, calm attentive expression, soft window light, simple lived-in background. The creator is alone with empty hands. No products, screens, text, logos, or collage elements.");
+  const [motionPrompt, setMotionPrompt] = useState("The creator holds eye contact, takes a small natural breath, blinks once, and gives a restrained knowing smile. Locked camera, subtle human motion only.");
   const activeReference = workspace.references.find((reference) => reference.id === props.activeClip?.referenceImageId);
   const story = selectedReel?.cards[0]?.text || "";
   const wordCount = story.trim() ? story.trim().split(/\s+/).length : 0;
   const exporting = selectedReel ? Boolean(props.exportProgress[selectedReel.id] && props.exportProgress[selectedReel.id] < 100) : false;
   const isEditing = Boolean(selectedReel && editingReelId === selectedReel.id);
+  const videoAvailable = Boolean(props.capabilities?.openrouter || props.capabilities?.fal);
+
+  async function submitAsset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const created = assetKind === "image"
+      ? await props.onGenerateImage(imageDirection.trim())
+      : await props.onGenerateVideo(motionPrompt.trim());
+    if (created) setAssetComposerOpen(false);
+  }
 
   return (
     <div className="cast-shell">
@@ -808,15 +1058,27 @@ function CastStudio(props: CastStudioProps) {
       </aside>
 
       <main className="cast-main">
-        <header className="cast-topbar"><div><span>CAST STUDIO / {creator.name.toUpperCase()}</span><h1>Make the next reel.</h1></div><div className="cast-topbar-status"><span className="signal signal--live" />{props.clerkEnabled ? <Show when="signed-in" fallback={<>Saved on this device</>}>Cloud autosave on</Show> : "Saved on this device"}</div></header>
+        <header className="cast-topbar"><div><button className="studio-back-button" onClick={props.onChangeCast}><ArrowLeft size={14} /> Back to cast</button><span>CAST STUDIO / {creator.name.toUpperCase()}</span><h1>Make the next reel.</h1></div><div className="cast-topbar-status"><span className="signal signal--live" />{props.clerkEnabled ? <Show when="signed-in" fallback={<>Saved on this device</>}>Cloud autosave on</Show> : "Saved on this device"}</div></header>
         {props.error ? <Notice message={props.error} onDismiss={props.onDismissError} /> : null}
         <div className="cast-workbench" id="cast-studio">
           <section className="cast-assets-panel" id="cast-backgrounds">
-            <div className="cast-profile"><img src={creator.imageDataUrl} alt={creator.name} /><div><span>YOUR CAST</span><h2>{creator.name}</h2><p>{creator.archetype}</p></div></div>
+            <div className="cast-profile"><img src={creator.imageDataUrl} alt={creator.name} /><div><span>YOUR CAST</span><h2>{creator.name}</h2><p>{creator.archetype}</p><button className="change-cast-button" onClick={props.onChangeCast}>Change cast <ArrowRight size={11} /></button></div></div>
             <div className="cast-character-note"><span>CONTINUITY</span><p>{creator.characterBible}</p></div>
-            <div className="asset-heading"><div><span>BACKGROUND LIBRARY</span><strong>Choose one image or video</strong></div><button title="Video generation is planned for run two" disabled><Plus size={15} /></button></div>
+            <div className="asset-heading"><div><span>ALL CAST ASSETS · {workspace.clips.length}</span><strong>Choose an image or video</strong></div><button title="Generate a new cast asset" aria-label="Generate a new cast asset" onClick={() => setAssetComposerOpen((open) => !open)} className={assetComposerOpen ? "is-active" : ""}><Plus size={15} /></button></div>
+            {assetComposerOpen ? (
+              <form className="asset-composer" onSubmit={submitAsset}>
+                <div className="asset-composer-head"><strong>New cast asset</strong><button type="button" aria-label="Close asset generator" onClick={() => setAssetComposerOpen(false)}><X size={13} /></button></div>
+                <div className="asset-kind-tabs"><button type="button" className={assetKind === "image" ? "is-active" : ""} onClick={() => setAssetKind("image")}><ImageIcon size={13} /> Image</button><button type="button" className={assetKind === "video" ? "is-active" : ""} onClick={() => setAssetKind("video")}><FileVideo size={13} /> Video</button></div>
+                {assetKind === "image" ? (
+                  <label><span>PORTRAIT DIRECTION</span><textarea value={imageDirection} rows={5} onChange={(event) => setImageDirection(event.target.value)} /><small>Uses the approved cast portrait as the identity source. The prompt keeps the person alone and excludes product screenshots.</small></label>
+                ) : (
+                  <label><span>MOTION PROMPT</span><textarea value={motionPrompt} rows={5} onChange={(event) => setMotionPrompt(event.target.value)} /><small>{videoAvailable ? "The exact identity-locked provider prompt will be saved with the finished clip." : "Video generation is ready in the interface, but no OpenRouter or fal key is connected yet."}</small></label>
+                )}
+                <button className="button button--primary button--wide" disabled={!((assetKind === "image" ? imageDirection : motionPrompt).trim()) || props.busy === "image-asset" || props.busy === "video-asset" || (assetKind === "video" && !videoAvailable)}>{props.busy === `${assetKind}-asset` ? <LoaderCircle className="spin" size={15} /> : assetKind === "image" ? <ImageIcon size={15} /> : <FileVideo size={15} />}{assetKind === "image" ? "Generate image" : videoAvailable ? "Generate 15s video" : "Connect video provider"}</button>
+              </form>
+            ) : null}
             <div className="asset-list">
-              {workspace.clips.map((clip) => <button key={clip.id} className={props.selectedAssetId === clip.id || selectedReel?.clipId === clip.id ? "is-selected" : ""} onClick={() => props.onSelectAsset(clip.id)}><div>{clip.videoUrl ? <video src={clip.videoUrl} muted playsInline /> : <img src={clip.posterUrl} alt="" />}{clip.videoUrl ? <FileVideo size={13} /> : <ImageIcon size={13} />}</div><span>{clip.label}</span><small>{clip.provider === "still" ? "$0 · subtle push-in" : `${clip.provider} · reusable`}</small></button>)}
+              {workspace.clips.map((clip) => <button key={clip.id} disabled={clip.status !== "ready"} title={clip.error} className={props.selectedAssetId === clip.id || selectedReel?.clipId === clip.id ? "is-selected" : ""} onClick={() => props.onSelectAsset(clip.id)}><div>{clip.videoUrl ? <video src={clip.videoUrl} muted playsInline /> : <img src={clip.posterUrl} alt="" />}{clip.status === "queued" || clip.status === "generating" ? <LoaderCircle className="spin" size={13} /> : clip.videoUrl ? <FileVideo size={13} /> : <ImageIcon size={13} />}</div><span>{clip.label}</span><small>{clip.status === "failed" ? "Generation failed" : clip.status === "queued" || clip.status === "generating" ? "Generating · safely saved" : clip.provider === "still" ? "$0 · subtle push-in" : `${clip.provider} · reusable`}</small></button>)}
             </div>
             {props.activeClip ? (
               <div className="asset-prompt-card">
@@ -825,7 +1087,7 @@ function CastStudio(props: CastStudioProps) {
                 <div className="asset-prompt-source"><span>IDENTITY SOURCE</span><strong>{activeReference?.label || "Approved cast portrait"}</strong></div>
               </div>
             ) : null}
-            <div className="motion-note"><Plus size={14} /><div><strong>Add motion in run two</strong><span>Generate once, then reuse it across many stories.</span></div></div>
+            <button className="motion-note" onClick={() => { setAssetKind("video"); setAssetComposerOpen(true); }}><Plus size={14} /><div><strong>Add a reusable motion clip</strong><span>{videoAvailable ? "Generate once, then reuse it across many stories." : "Connect OpenRouter later; your image workflow works now."}</span></div></button>
           </section>
 
           <section className="cast-preview-stage">

@@ -130,8 +130,7 @@ class OpenRouterVideoProvider implements VideoProvider {
       return { requestId, status: "generating" };
     }
     if (payload.status === "completed") {
-      const videoUrl = payload.unsigned_urls?.[0] || `/api/video/content?requestId=${encodeURIComponent(requestId)}`;
-      return { requestId, status: "ready", videoUrl };
+      return { requestId, status: "ready", videoUrl: `/api/video/content?requestId=${encodeURIComponent(requestId)}` };
     }
     return {
       requestId,

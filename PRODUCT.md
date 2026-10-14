@@ -41,6 +41,8 @@ The product has three intentionally distinct surfaces:
 - **Cast onboarding:** a focused three-decision flow for product, creative direction, and cast selection.
 - **Cast studio:** the persistent signed-in workspace for the selected creator, reusable background library, story batch, live preview, editing, and export.
 
+Navigation is explicit. The studio always shows both **Back to cast** and **Change cast**; the Hypecast logo is not the only exit. Returning to cast selection preserves the current studio. Choosing a different creator starts a separate studio record so the former cast, assets, scripts, and exports remain available under Recent Studios.
+
 ### Step 1 — Sign in
 
 Production generation requires authentication because OpenAI image calls still have a marginal cost. The zero-credit demo can remain available without paid calls.
@@ -90,6 +92,8 @@ Video generation is a library-building action, not part of the first-run funnel.
 
 Once the still-based format is validated, the user may generate a small number of new background videos through the provider adapter. A generated asset should be stored once and reused across many hooks and future batches. The product should show the estimated cost before submission and never regenerate a background merely because the hook text changed.
 
+The studio’s **All cast assets** library is append-only from the user’s perspective. It lists the approved portrait, every derived portrait, every queued or completed video, and its status. **New cast asset** opens an explicit image/video composer. New images use the approved cast portrait as the identity source and exclude products, screenshots, logos, text, and collage elements. The video composer is visible but disabled with a clear explanation until an OpenRouter or fal credential is configured.
+
 The existing OpenRouter adapter discovers compatible models dynamically and supports asynchronous submission, polling, and retrieval. It remains inactive until the user explicitly chooses to add motion to the library. A fal adapter remains available as a later quality tier.
 
 ## 7. MVP scope
@@ -106,6 +110,8 @@ The existing OpenRouter adapter discovers compatible models dynamically and supp
 - In-browser preview.
 - Downloadable silent 9:16 H.264 MP4 export.
 - Local persistence plus authenticated Convex project/asset persistence.
+- Explicit studio navigation, non-destructive cast switching, and an all-assets library.
+- On-demand identity-consistent cast images that append to the library rather than replacing existing assets.
 - A provider-independent video adapter kept outside the first-run path.
 - Clear disclosure that the first-run background is a still, not generated video.
 - A deployable Next.js application, public repository, and verified Vercel URL.
@@ -150,6 +156,8 @@ The existing OpenRouter adapter discovers compatible models dynamically and supp
 
 - Convex stores ownership, separate project snapshots, approved decisions, generated assets, background-library entries, versioned story batches, export records, jobs, reels, and edit state.
 - Inline generated images are uploaded to storage for resumability after authentication is configured.
+- Video jobs are added to the saved project before provider submission, survive refresh while queued, and are polled to completion.
+- Completed provider videos are copied into Convex storage; the provider URL is not treated as permanent project storage.
 - Returning signed-in users restore the latest cloud project and can reopen earlier studios; device storage remains a signed-out fallback.
 - A completed MP4 downloads immediately, then uploads to the project’s Convex asset library without blocking the download.
 
@@ -193,6 +201,9 @@ The first-run MVP is accepted only if a user can:
 11. Reload and resume without losing approved decisions.
 12. Rewrite a batch without erasing earlier scripts, then reopen either batch later.
 13. Start another product without overwriting the previous cast, backgrounds, reels, or export records.
+14. Use a visible Back to cast or Change cast control without knowing that the logo is clickable.
+15. Generate an additional identity-consistent portrait and see it appended to All cast assets alongside every earlier image and video.
+16. Select a different creator without deleting the previous creator’s studio; reopen the former studio from Recent Studios.
 
 Technical acceptance also requires:
 
@@ -201,6 +212,8 @@ Technical acceptance also requires:
 - unauthenticated production users cannot trigger paid media calls;
 - changing hook text never triggers image or video regeneration;
 - first-run code never calls the video-provider routes;
+- unavailable video providers are shown as unavailable before submission rather than failing silently;
+- queued video records and exact prompts are saved before polling, and completed clips are copied into durable project storage;
 - tests, lint, typecheck, build, and browser export pass;
 - deployment and generated-media claims are made only after verification.
 

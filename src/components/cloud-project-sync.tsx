@@ -12,6 +12,7 @@ type CloudProjectSyncProps = {
   hydrated: boolean;
   pendingExports: PendingExport[];
   onAssetStored: (kind: "candidate" | "reference", id: string, url: string) => void;
+  onClipStored: (id: string, url: string) => void;
   onExportStored: (id: string, url: string) => void;
   onRestore: (workspace: WorkspaceSnapshot) => void;
   onProjectsChanged: (projects: SavedProject[]) => void;
@@ -45,6 +46,7 @@ export function CloudProjectSync({
   hydrated,
   pendingExports,
   onAssetStored,
+  onClipStored,
   onExportStored,
   onRestore,
   onProjectsChanged,
@@ -179,6 +181,53 @@ export function CloudProjectSync({
       })();
     }
   }, [generateUploadUrl, isSignedIn, onAssetStored, projectClientId, projectId, saveGenerated, workspace]);
+
+  useEffect(() => {
+    if (!projectId || !isSignedIn || projectClientId !== workspace.clientProjectId) return;
+    const clips = workspace.clips.filter(
+      (clip) => clip.status === "ready" && clip.videoUrl && clip.storageStatus !== "stored",
+    );
+
+    for (const clip of clips) {
+      const key = `${workspace.clientProjectId}:clip:${clip.id}`;
+      if (uploading.current.has(key)) continue;
+      uploading.current.add(key);
+      void (async () => {
+        try {
+          const blob = await fetch(clip.videoUrl as string).then((response) => {
+            if (!response.ok) throw new Error("Generated video could not be read for cloud storage");
+            return response.blob();
+          });
+          const uploadUrl = await generateUploadUrl();
+          const result = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": blob.type || "video/mp4" },
+            body: blob,
+          });
+          if (!result.ok) throw new Error("Convex clip upload failed");
+          const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
+          const url = await saveGenerated({
+            projectId,
+            clientAssetId: clip.id,
+            kind: "clip",
+            provider: clip.provider,
+            storageId,
+            metadata: {
+              requestId: clip.requestId,
+              referenceImageId: clip.referenceImageId,
+              motionPrompt: clip.motionPrompt,
+              generationPrompt: clip.generationPrompt,
+            },
+          });
+          onClipStored(clip.id, url);
+        } catch (cause) {
+          console.error("Cloud clip upload failed", cause);
+        } finally {
+          uploading.current.delete(key);
+        }
+      })();
+    }
+  }, [generateUploadUrl, isSignedIn, onClipStored, projectClientId, projectId, saveGenerated, workspace]);
 
   useEffect(() => {
     if (!projectId || !isSignedIn || projectClientId !== workspace.clientProjectId) return;

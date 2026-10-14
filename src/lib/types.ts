@@ -54,6 +54,7 @@ export type VideoClip = {
   requestId?: string;
   videoUrl?: string;
   posterUrl?: string;
+  storageStatus?: "pending" | "stored";
   error?: string;
 };
 
@@ -109,6 +110,7 @@ export type WorkspaceSnapshot = {
   brief?: ProductBrief;
   creators: CreatorCandidate[];
   selectedCreatorId?: string;
+  activeCastId?: string;
   references: ReferenceImage[];
   clips: VideoClip[];
   reels: Reel[];
