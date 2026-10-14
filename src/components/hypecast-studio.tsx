@@ -8,6 +8,7 @@ import {
   CircleAlert,
   Clock3,
   Cloud,
+  Copy,
   Download,
   FileArchive,
   FileVideo,
@@ -29,6 +30,7 @@ import { apiRequest } from "@/lib/api";
 import { demoClips, demoCreators, demoCreatorsForBrief, demoReels, demoReferences } from "@/lib/demo-data";
 import { DEFAULT_MOTION_RECIPE, MOTION_RECIPES } from "@/lib/motion-recipes";
 import { downloadBlob, exportReel, reelFilename } from "@/lib/reel-export";
+import { buildInstagramBio, instagramProfileFilename, squareProfileCrop } from "@/lib/instagram-profile";
 import { composeVideoPrompt } from "@/lib/video-prompt";
 import { InstagramPublisher } from "@/components/instagram-publisher";
 import type {
@@ -1059,6 +1061,61 @@ type OnboardingProps = {
 function CastOnboarding(props: OnboardingProps) {
   const { workspace, busy, error } = props;
   const selectedCreator = workspace.creators.find((creator) => creator.id === workspace.selectedCreatorId);
+  const [profileDownloadId, setProfileDownloadId] = useState("");
+  const [copiedBioId, setCopiedBioId] = useState("");
+  const [profileKitNotice, setProfileKitNotice] = useState("");
+  const instagramBio = selectedCreator
+    ? buildInstagramBio(selectedCreator, workspace.brief, workspace.productUrl)
+    : "";
+
+  function selectCreator(id: string) {
+    setCopiedBioId("");
+    setProfileKitNotice("");
+    props.onChooseCreator(id);
+  }
+
+  async function downloadProfilePhoto() {
+    if (!selectedCreator?.imageDataUrl) return;
+    setProfileDownloadId(selectedCreator.id);
+    setProfileKitNotice("");
+    try {
+      const image = new Image();
+      image.crossOrigin = "anonymous";
+      image.decoding = "async";
+      image.src = selectedCreator.imageDataUrl;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = 1080;
+      canvas.height = 1080;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("This browser could not prepare the profile photo.");
+      const crop = squareProfileCrop(image.naturalWidth, image.naturalHeight);
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+      context.drawImage(image, crop.x, crop.y, crop.size, crop.size, 0, 0, 1080, 1080);
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((result) => result ? resolve(result) : reject(new Error("The profile photo could not be encoded.")), "image/png");
+      });
+      downloadBlob(blob, instagramProfileFilename(selectedCreator.name));
+      setProfileKitNotice("Profile photo downloaded · ready for Instagram's circular crop.");
+    } catch (cause) {
+      setProfileKitNotice(cause instanceof Error ? cause.message : "The profile photo could not be downloaded.");
+    } finally {
+      setProfileDownloadId("");
+    }
+  }
+
+  async function copyInstagramBio() {
+    if (!selectedCreator || !instagramBio) return;
+    try {
+      await navigator.clipboard.writeText(instagramBio);
+      setCopiedBioId(selectedCreator.id);
+      setProfileKitNotice("Instagram bio and product link copied.");
+    } catch {
+      setProfileKitNotice("Copy was blocked by the browser. Select the bio text and copy it manually.");
+    }
+  }
+
   return (
     <div className="onboarding-shell">
       <header className="studio-topbar">
@@ -1122,16 +1179,36 @@ function CastOnboarding(props: OnboardingProps) {
 
           {workspace.step === 2 ? (
             <div className="onboarding-stage onboarding-stage--wide">
-              <StageHeader step="03 / 03" eyebrow="CHOOSE THE CAST" title="Who should carry the account?" description="Choose the person who feels native to the audience—not the most polished face. CueFace will immediately turn that portrait into the first 15-second reel." />
+              <StageHeader step="03 / 03" eyebrow="CHOOSE THE CAST" title="Who should carry the account?" description="Choose the person who feels native to the audience—not the most polished face. CueFace will prepare the profile photo and bio before opening the reel studio." />
               <div className="onboarding-cast-grid">
                 {workspace.creators.map((creator) => (
-                  <button key={creator.id} className={`onboarding-cast-card ${workspace.selectedCreatorId === creator.id ? "is-selected" : ""}`} onClick={() => creator.imageStatus === "ready" && props.onChooseCreator(creator.id)} disabled={creator.imageStatus !== "ready"}>
+                  <button key={creator.id} className={`onboarding-cast-card ${workspace.selectedCreatorId === creator.id ? "is-selected" : ""}`} onClick={() => creator.imageStatus === "ready" && selectCreator(creator.id)} disabled={creator.imageStatus !== "ready"}>
                     <div className="creator-image">{creator.imageDataUrl ? <img src={creator.imageDataUrl} alt={creator.name} /> : <div className="loading-tile"><LoaderCircle className={creator.imageStatus === "generating" ? "spin" : ""} /><span>{creator.imageStatus === "failed" ? "Image failed" : "Casting…"}</span></div>}{workspace.selectedCreatorId === creator.id ? <span className="selected-stamp"><Check size={14} /> YOUR CAST</span> : null}</div>
                     <div><span>{creator.archetype}</span><h3>{creator.name}</h3><p>{creator.energy} · {creator.wardrobe}</p></div>
                   </button>
                 ))}
               </div>
-              <div className="onboarding-action"><button className="button button--primary" onClick={props.onOpenStudio} disabled={!selectedCreator || busy === "opening-studio"}>{busy === "opening-studio" ? <LoaderCircle className="spin" size={17} /> : <ArrowRight size={17} />} {busy === "opening-studio" ? "Creating the first reel…" : `Choose ${selectedCreator?.name.split(" ")[0] || "a cast"} and create reel`}</button><span>The chosen portrait becomes a 15-second still background with editable text.</span></div>
+              {selectedCreator ? (
+                <section className="instagram-profile-kit" aria-label="Instagram profile starter kit">
+                  <div className="instagram-profile-photo">
+                    <span>PROFILE PHOTO</span>
+                    <div><img src={selectedCreator.imageDataUrl} alt={`${selectedCreator.name} circular profile preview`} /></div>
+                    <small>1080 × 1080 · circle-safe crop</small>
+                  </div>
+                  <div className="instagram-profile-bio">
+                    <span>INSTAGRAM STARTER KIT</span>
+                    <h3>{selectedCreator.name} is ready for the account.</h3>
+                    <p>Download the profile photo before opening the studio, then copy this personal bio with the product link already included.</p>
+                    <div className="instagram-bio-copy"><span>BIO + PRODUCT LINK</span><pre>{instagramBio}</pre></div>
+                    {profileKitNotice ? <small className="instagram-profile-notice" aria-live="polite">{profileKitNotice}</small> : null}
+                  </div>
+                  <div className="instagram-profile-actions">
+                    <button className="button button--primary" onClick={() => void downloadProfilePhoto()} disabled={!selectedCreator.imageDataUrl || profileDownloadId === selectedCreator.id}>{profileDownloadId === selectedCreator.id ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />}{profileDownloadId === selectedCreator.id ? "Preparing photo…" : "Download profile photo"}</button>
+                    <button className="button" onClick={() => void copyInstagramBio()}>{copiedBioId === selectedCreator.id ? <Check size={15} /> : <Copy size={15} />}{copiedBioId === selectedCreator.id ? "Bio copied" : "Copy bio + link"}</button>
+                  </div>
+                </section>
+              ) : null}
+              <div className="onboarding-action"><button className="button button--primary" onClick={props.onOpenStudio} disabled={!selectedCreator || busy === "opening-studio"}>{busy === "opening-studio" ? <LoaderCircle className="spin" size={17} /> : <ArrowRight size={17} />} {busy === "opening-studio" ? "Creating the first reel…" : `Use ${selectedCreator?.name.split(" ")[0] || "this cast"} and open the studio`}</button><span>The chosen portrait becomes a 15-second still background with editable text.</span></div>
             </div>
           ) : null}
         </section>
