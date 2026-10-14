@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const result = await parseStructured(
       creatorsSchema,
       "hypecast_creator_candidates",
-      "Design five distinct, plausible UGC creator directions for one social account. Each must feel like a real person, not an influencer cliché. Vary gender presentation and visual archetype. IDs must be creator-1 through creator-5. The characterBible must be a compact, highly specific continuity description of face, hair, age, skin, build, wardrobe palette, and camera style. Do not name real people or celebrities.",
+      "Design five distinct, plausible UGC creator directions for one social account. Each must feel like a real person, not an influencer cliché. Vary gender presentation and visual archetype. IDs must be creator-1 through creator-5. The characterBible must describe only the person: face, hair, age, skin, build, wardrobe palette, and camera style. Do not include the product, UI, screenshots, devices, props, logos, brand context, real people, or celebrities in any creator field.",
       JSON.stringify(brief),
     );
     return Response.json({

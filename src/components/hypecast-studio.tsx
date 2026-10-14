@@ -360,7 +360,6 @@ export function HypecastStudio() {
             kind: "candidate",
             name: creator.name,
             characterBible: creator.characterBible,
-            productName: workspace.brief?.productName,
           });
           setWorkspace((current) => ({
             ...current,
