@@ -39,7 +39,7 @@ export function ReelPreview({ reel, clip, compact = false }: ReelPreviewProps) {
             ref={videoRef}
             src={clip.videoUrl}
             muted
-            loop
+            loop={(clip.duration || 15) >= 15}
             autoPlay
             playsInline
             crossOrigin="anonymous"

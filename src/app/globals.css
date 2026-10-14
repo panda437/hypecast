@@ -464,9 +464,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .motion-source-note p { margin: 5px 0 0; color: var(--muted); font-size: 7px; line-height: 1.4; }
 .motion-source-note > button { width: 100%; margin-top: 7px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 7px; border: 1px solid var(--accent); border-radius: 6px; background: rgba(255,101,66,.08); color: var(--accent-light); font-size: 7px; cursor: pointer; }
 .motion-duration { margin: 1px 0 8px; }
-.motion-duration > div { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px; }
-.motion-duration button { padding: 7px; border: 1px solid var(--line); border-radius: 6px; background: #10100f; color: var(--muted); text-align: left; cursor: pointer; }
-.motion-duration button.is-active { border-color: var(--acid); background: rgba(182,243,107,.05); color: var(--ink); }
+.motion-duration-card { margin-top: 6px; padding: 9px; border: 1px solid var(--acid); border-radius: 6px; background: rgba(182,243,107,.05); color: var(--ink); }
 .motion-duration strong, .motion-duration small { display: block; }
 .motion-duration strong { font-size: 8px; }
 .motion-duration small { margin-top: 3px; color: var(--dim); font-size: 6px; line-height: 1.3; }

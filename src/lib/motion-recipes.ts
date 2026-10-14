@@ -64,7 +64,7 @@ export const MOTION_RECIPES: MotionRecipe[] = [
     requiresNewImage: false,
     sourceNote: "Works with nearly any clean cast portrait.",
     imageDirection: "Close waist-up portrait of the approved creator, relaxed mouth and attentive eyes, soft natural daylight, simple home background. The creator is alone with empty hands. No products, devices, screens, text, logos, or collage elements.",
-    motionPrompt: "The creator holds eye contact for only a beat, looks down as if trying not to react, presses their lips together, then lets a real smile escape while looking back toward the lens. Their shoulders move slightly with the suppressed laugh. Use gentle handheld breathing rather than a locked camera and settle before the loop ends.",
+    motionPrompt: "The creator holds eye contact for only a beat, looks down as if trying not to react, presses their lips together, then lets a real smile escape while looking back toward the lens. Their shoulders move slightly with the suppressed laugh. Use gentle handheld breathing rather than a locked camera and let the moment finish naturally.",
   },
   {
     id: "window-check",

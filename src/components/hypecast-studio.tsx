@@ -55,7 +55,6 @@ type VideoPlan = {
     resolution: "480p";
     estimatedPerSecondUsd: number;
     estimatedImageInputUsd: number;
-    estimatedPreviewUsd: number;
     estimatedClipUsd: number;
     estimatedBatchUsd: number;
   };
@@ -637,7 +636,7 @@ export function HypecastStudio() {
     }
   }
 
-  async function generateCastVideo(motionPrompt: string, duration: 5 | 15) {
+  async function generateCastVideo(motionPrompt: string, duration: 15) {
     const sourceClip = workspace.clips.find((clip) => clip.id === selectedAssetId) || workspace.clips[0];
     const reference = workspace.references.find((item) => item.id === sourceClip?.referenceImageId) || workspace.references.find((item) => item.status === "ready");
     if (!reference?.imageDataUrl) {
@@ -1083,7 +1082,7 @@ type CastStudioProps = {
   onSelectBatch: (id: string) => void;
   onBuildReels: () => void;
   onGenerateImage: (direction: string) => Promise<boolean>;
-  onGenerateVideo: (motionPrompt: string, duration: 5 | 15) => Promise<boolean>;
+  onGenerateVideo: (motionPrompt: string, duration: 15) => Promise<boolean>;
   onExport: (reel: Reel) => void;
 };
 
@@ -1095,7 +1094,7 @@ function CastStudio(props: CastStudioProps) {
   const [imageDirection, setImageDirection] = useState("Front-facing waist-up portrait, calm attentive expression, soft window light, simple lived-in background. The creator is alone with empty hands. No products, screens, text, logos, or collage elements.");
   const [selectedRecipeId, setSelectedRecipeId] = useState(DEFAULT_MOTION_RECIPE.id);
   const [motionPrompt, setMotionPrompt] = useState(DEFAULT_MOTION_RECIPE.motionPrompt);
-  const [videoDuration, setVideoDuration] = useState<5 | 15>(5);
+  const videoDuration = 15 as const;
   const activeReference = workspace.references.find((reference) => reference.id === props.activeClip?.referenceImageId);
   const story = selectedReel?.cards[0]?.text || "";
   const wordCount = story.trim() ? story.trim().split(/\s+/).length : 0;
@@ -1103,13 +1102,9 @@ function CastStudio(props: CastStudioProps) {
   const isEditing = Boolean(selectedReel && editingReelId === selectedReel.id);
   const videoAvailable = Boolean(props.capabilities?.openrouter || props.capabilities?.fal);
   const selectedRecipe = MOTION_RECIPES.find((recipe) => recipe.id === selectedRecipeId) || DEFAULT_MOTION_RECIPE;
-  const videoEstimate = videoDuration === 5
-    ? props.videoPlan?.selected.estimatedPreviewUsd
-    : props.videoPlan?.selected.estimatedClipUsd;
+  const videoEstimate = props.videoPlan?.selected.estimatedClipUsd;
   const videoEstimateLabel = videoEstimate === undefined ? "price checking" : `$${videoEstimate.toFixed(2)}`;
-  const previewEstimate = props.videoPlan?.selected.estimatedPreviewUsd;
-  const previewEstimateLabel = previewEstimate === undefined ? "price checking" : `$${previewEstimate.toFixed(2)}`;
-  const providerPromptPreview = composeVideoPrompt(motionPrompt, videoDuration);
+  const providerPromptPreview = composeVideoPrompt(motionPrompt);
 
   async function submitAsset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1166,7 +1161,7 @@ function CastStudio(props: CastStudioProps) {
                     <div className="motion-source-note"><div><span>SOURCE CHECK</span><p>{selectedRecipe.sourceNote}</p></div>{selectedRecipe.requiresNewImage ? <button type="button" onClick={() => { setImageDirection(selectedRecipe.imageDirection); void props.onGenerateImage(selectedRecipe.imageDirection); }} disabled={props.busy === "image-asset"}>{props.busy === "image-asset" ? <LoaderCircle className="spin" size={13} /> : <ImageIcon size={13} />} Use image credits · create car still</button> : null}</div>
                     <label><span>FINAL MOTION PROMPT · EDIT ANYTHING</span><textarea value={motionPrompt} rows={7} onChange={(event) => setMotionPrompt(event.target.value)} /><small>The exact identity-locked prompt is saved with the clip. No credits are used while you edit this.</small></label>
                     <details className="provider-prompt-preview"><summary>View exact provider prompt</summary><p>{providerPromptPreview}</p></details>
-                    <div className="motion-duration"><span>PAID GENERATION LENGTH</span><div><button type="button" className={videoDuration === 5 ? "is-active" : ""} onClick={() => setVideoDuration(5)}><strong>5s test</strong><small>{previewEstimateLabel} est. · loops in 15s reel</small></button><button type="button" className={videoDuration === 15 ? "is-active" : ""} onClick={() => setVideoDuration(15)}><strong>15s full</strong><small>{props.videoPlan?.selected.estimatedClipUsd === undefined ? "price checking" : `$${props.videoPlan.selected.estimatedClipUsd.toFixed(2)} est.`}</small></button></div></div>
+                    <div className="motion-duration"><span>PAID GENERATION LENGTH</span><div className="motion-duration-card"><strong>15s continuous motion</strong><small>{videoEstimateLabel} est. · one full generation · no repeated segment</small></div></div>
                     <p className="motion-spend-note">Credits are used only when you press the generation button below.</p>
                   </div>
                 )}
@@ -1174,7 +1169,7 @@ function CastStudio(props: CastStudioProps) {
               </form>
             ) : null}
             <div className="asset-list">
-              {workspace.clips.map((clip) => <button key={clip.id} disabled={clip.status !== "ready"} title={clip.error} className={props.selectedAssetId === clip.id || selectedReel?.clipId === clip.id ? "is-selected" : ""} onClick={() => props.onSelectAsset(clip.id)}><div>{clip.videoUrl ? <video src={clip.videoUrl} muted playsInline loop /> : <img src={clip.posterUrl} alt="" />}{clip.status === "queued" || clip.status === "generating" ? <LoaderCircle className="spin" size={13} /> : clip.videoUrl ? <FileVideo size={13} /> : <ImageIcon size={13} />}</div><span>{clip.label}</span><small>{clip.status === "failed" ? "Generation failed" : clip.status === "queued" || clip.status === "generating" ? "Generating · safely saved" : clip.provider === "still" ? "$0 · subtle push-in" : `${clip.provider} · ${clip.duration || 15}s reusable loop`}</small></button>)}
+              {workspace.clips.map((clip) => <button key={clip.id} disabled={clip.status !== "ready"} title={clip.error} className={props.selectedAssetId === clip.id || selectedReel?.clipId === clip.id ? "is-selected" : ""} onClick={() => props.onSelectAsset(clip.id)}><div>{clip.videoUrl ? <video src={clip.videoUrl} muted playsInline loop={(clip.duration || 15) >= 15} /> : <img src={clip.posterUrl} alt="" />}{clip.status === "queued" || clip.status === "generating" ? <LoaderCircle className="spin" size={13} /> : clip.videoUrl ? <FileVideo size={13} /> : <ImageIcon size={13} />}</div><span>{clip.label}</span><small>{clip.status === "failed" ? "Generation failed" : clip.status === "queued" || clip.status === "generating" ? "Generating · safely saved" : clip.provider === "still" ? "$0 · subtle push-in" : clip.duration === 5 ? `${clip.provider} · legacy 5s · ending holds` : `${clip.provider} · 15s reusable motion`}</small></button>)}
             </div>
             {props.activeClip ? (
               <div className="asset-prompt-card">
@@ -1183,7 +1178,7 @@ function CastStudio(props: CastStudioProps) {
                 <div className="asset-prompt-source"><span>IDENTITY SOURCE</span><strong>{activeReference?.label || "Approved cast portrait"}</strong></div>
               </div>
             ) : null}
-            <button className="motion-note" onClick={() => { setAssetKind("video"); setAssetComposerOpen(true); }}><Plus size={14} /><div><strong>Plan motion before spending</strong><span>{videoAvailable ? `Choose and edit directions free · ${previewEstimateLabel} estimated for a reusable 5s test.` : "Connect OpenRouter later; your image workflow works now."}</span></div></button>
+            <button className="motion-note" onClick={() => { setAssetKind("video"); setAssetComposerOpen(true); }}><Plus size={14} /><div><strong>Plan motion before spending</strong><span>{videoAvailable ? `Choose and edit directions free · ${videoEstimateLabel} estimated for one reusable 15s clip.` : "Connect OpenRouter later; your image workflow works now."}</span></div></button>
           </section>
 
           <section className="cast-preview-stage">

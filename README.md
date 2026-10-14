@@ -34,7 +34,7 @@ Open `http://localhost:3000` and choose **Try the zero-credit demo** to exercise
 
 ## Second-run background library
 
-The studio’s **Plan motion before spending** action uses free, editable motion recipes before an explicit OpenRouter call. The default is a 5-second test looped into a 15-second export; 15-second generation is optional. The economy configuration selects 9:16, 480p, first-frame image-to-video models at or below $0.03 per output second. The currently pinned model is `x-ai/grok-imagine-video-1.5-lite`, verified at $0.02 per second plus a $0.01 image-input charge—about $0.11 for 5 seconds or $0.31 for 15. A generated background is paid for once, copied into Convex storage, and reused across many story batches. Video generation never occurs merely because the user changes reel text.
+The studio’s **Plan motion before spending** action uses free, editable motion recipes before an explicit OpenRouter call. Every new paid motion asset is one continuous 15-second generation—Hypecast does not repeat a shorter segment to fill the reel. The economy configuration selects 9:16, 480p, first-frame image-to-video models at or below $0.03 per output second. The currently pinned model is `x-ai/grok-imagine-video-1.5-lite`, verified at $0.02 per second plus a $0.01 image-input charge, or about $0.31 for 15 seconds. A generated background is paid for once, copied into Convex storage, and reused across many story batches. Video generation never occurs merely because the user changes reel text.
 
 ## Quality gates
 

@@ -135,32 +135,32 @@ export async function exportReel(reel: Reel, clip: VideoClip, onProgress: (progr
       if (!track) throw new Error("The generated clip contains no readable video track.");
       const source = new CanvasSource(canvas, { codec: "avc", quality: new Quality("high") });
       output.addVideoTrack(source, { frameRate: 24 });
-      output.setMetadataTags({ title: `${reel.title} — Hypecast looped motion` });
+      output.setMetadataTags({ title: `${reel.title} — Hypecast legacy motion with held ending` });
       await output.start();
       const frameRate = 24;
       const sourceDuration = clip.duration || 5;
-      const sourceFrames = sourceDuration * frameRate;
-      const loops = Math.ceil(DURATION / sourceDuration);
+      const outputFrames = DURATION * frameRate;
+      const lastSourceFrame = Math.max(0, sourceDuration * frameRate - 1);
+      const timestamps = Array.from(
+        { length: outputFrames },
+        (_, frame) => Math.min(frame, lastSourceFrame) / frameRate,
+      );
       let outputFrame = 0;
-      for (let loop = 0; loop < loops; loop += 1) {
-        const sink = new VideoSampleSink(track);
-        const timestamps = Array.from({ length: sourceFrames }, (_, frame) => frame / frameRate);
-        for await (const sample of sink.samplesAtTimestamps(timestamps)) {
-          if (outputFrame >= DURATION * frameRate) break;
-          if (!sample) {
-            outputFrame += 1;
-            continue;
-          }
-          const time = outputFrame / frameRate;
-          ctx.fillStyle = "#090909";
-          ctx.fillRect(0, 0, WIDTH, HEIGHT);
-          sample.drawWithFit(ctx, { fit: "cover" });
-          drawOverlay(ctx, reel, time);
-          await source.add(time, 1 / frameRate, { keyFrame: outputFrame % (frameRate * sourceDuration) === 0 });
-          sample.close();
+      const sink = new VideoSampleSink(track);
+      for await (const sample of sink.samplesAtTimestamps(timestamps)) {
+        if (!sample) {
           outputFrame += 1;
-          if (outputFrame % 12 === 0) onProgress(Math.round((outputFrame / (DURATION * frameRate)) * 100));
+          continue;
         }
+        const time = outputFrame / frameRate;
+        ctx.fillStyle = "#090909";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        sample.drawWithFit(ctx, { fit: "cover" });
+        drawOverlay(ctx, reel, time);
+        await source.add(time, 1 / frameRate, { keyFrame: outputFrame % (frameRate * 2) === 0 });
+        sample.close();
+        outputFrame += 1;
+        if (outputFrame % 12 === 0) onProgress(Math.round((outputFrame / outputFrames) * 100));
       }
       await output.finalize();
     } else {
