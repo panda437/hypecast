@@ -30,11 +30,11 @@ Open `http://localhost:3000` and choose **Try the zero-credit demo** to exercise
 - Completed browser exports download immediately and are then uploaded to Convex storage for the signed-in user.
 - Signed-out demo work is retained on the current device as a fallback, but cross-device recovery requires sign-in.
 
-`OPENROUTER_API_KEY` is not required for the first run.
+`OPENROUTER_API_KEY` is not required for the first run. When configured, it must remain a server-only environment variable.
 
-## Future background library
+## Second-run background library
 
-OpenRouter and fal adapters remain available for a second-run **Add motion to library** feature. A generated background should be paid for once, stored, and reused across many hooks and batches. Video generation never occurs merely because the user changes reel text.
+The studio’s **Add motion to library** action uses OpenRouter for an explicit second-run generation. The economy configuration selects 15-second, 9:16, 480p image-to-video models at or below $0.03 per output second. The currently pinned model is `x-ai/grok-imagine-video-1.5-lite`, verified at $0.02 per second plus a $0.01 image-input charge. A generated background is paid for once, copied into Convex storage, and reused across many hooks and batches. Video generation never occurs merely because the user changes reel text.
 
 ## Quality gates
 

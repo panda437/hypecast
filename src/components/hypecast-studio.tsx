@@ -47,6 +47,17 @@ const PROJECTS_STORAGE_KEY = "hypecast-project-history-v1";
 const REEL_DURATION = 15;
 const onboardingSteps = ["Product", "Direction", "Cast"];
 
+type VideoPlan = {
+  selected: {
+    id: string;
+    resolution: "480p";
+    estimatedPerSecondUsd: number;
+    estimatedClipUsd: number;
+    estimatedBatchUsd: number;
+  };
+  maxPerSecondUsd: number;
+};
+
 const emptyWorkspace: WorkspaceSnapshot = {
   clientProjectId: "",
   mode: "demo",
@@ -144,6 +155,7 @@ export function HypecastStudio() {
   const [workspace, setWorkspace] = useState<WorkspaceSnapshot>(emptyWorkspace);
   const [hydrated, setHydrated] = useState(false);
   const [capabilities, setCapabilities] = useState<(AppCapabilities & { openrouter?: boolean }) | null>(null);
+  const [videoPlan, setVideoPlan] = useState<VideoPlan | null>(null);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [selectedReelId, setSelectedReelId] = useState("");
@@ -190,6 +202,9 @@ export function HypecastStudio() {
     }, 0);
     apiRequest<AppCapabilities & { openrouter?: boolean }>("/api/health")
       .then(setCapabilities)
+      .catch(() => null);
+    apiRequest<VideoPlan>("/api/video/models")
+      .then(setVideoPlan)
       .catch(() => null);
     return () => window.clearTimeout(hydrateTimer);
   }, []);
@@ -764,6 +779,7 @@ export function HypecastStudio() {
       error={error}
       exportProgress={exportProgress}
       capabilities={capabilities}
+      videoPlan={videoPlan}
       savedProjects={savedProjects}
       onDismissError={() => setError("")}
       onReset={resetProject}
@@ -1000,6 +1016,7 @@ type CastStudioProps = {
   error: string;
   exportProgress: Record<string, number>;
   capabilities: (AppCapabilities & { openrouter?: boolean }) | null;
+  videoPlan: VideoPlan | null;
   onDismissError: () => void;
   onReset: () => void;
   onChangeCast: () => void;
@@ -1028,6 +1045,8 @@ function CastStudio(props: CastStudioProps) {
   const exporting = selectedReel ? Boolean(props.exportProgress[selectedReel.id] && props.exportProgress[selectedReel.id] < 100) : false;
   const isEditing = Boolean(selectedReel && editingReelId === selectedReel.id);
   const videoAvailable = Boolean(props.capabilities?.openrouter || props.capabilities?.fal);
+  const videoEstimate = props.videoPlan?.selected.estimatedClipUsd;
+  const videoEstimateLabel = videoEstimate === undefined ? "price checking" : `$${videoEstimate.toFixed(2)}`;
 
   async function submitAsset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1072,9 +1091,9 @@ function CastStudio(props: CastStudioProps) {
                 {assetKind === "image" ? (
                   <label><span>PORTRAIT DIRECTION</span><textarea value={imageDirection} rows={5} onChange={(event) => setImageDirection(event.target.value)} /><small>Uses the approved cast portrait as the identity source. The prompt keeps the person alone and excludes product screenshots.</small></label>
                 ) : (
-                  <label><span>MOTION PROMPT</span><textarea value={motionPrompt} rows={5} onChange={(event) => setMotionPrompt(event.target.value)} /><small>{videoAvailable ? "The exact identity-locked provider prompt will be saved with the finished clip." : "Video generation is ready in the interface, but no OpenRouter or fal key is connected yet."}</small></label>
+                  <label><span>MOTION PROMPT</span><textarea value={motionPrompt} rows={5} onChange={(event) => setMotionPrompt(event.target.value)} /><small>{videoAvailable ? `${props.videoPlan?.selected.id || "OpenRouter video"} · 480p · ${videoEstimateLabel} estimated for 15s. The exact identity-locked prompt is saved with the clip.` : "Video generation is ready in the interface, but no OpenRouter or fal key is connected yet."}</small></label>
                 )}
-                <button className="button button--primary button--wide" disabled={!((assetKind === "image" ? imageDirection : motionPrompt).trim()) || props.busy === "image-asset" || props.busy === "video-asset" || (assetKind === "video" && !videoAvailable)}>{props.busy === `${assetKind}-asset` ? <LoaderCircle className="spin" size={15} /> : assetKind === "image" ? <ImageIcon size={15} /> : <FileVideo size={15} />}{assetKind === "image" ? "Generate image" : videoAvailable ? "Generate 15s video" : "Connect video provider"}</button>
+                <button className="button button--primary button--wide" disabled={!((assetKind === "image" ? imageDirection : motionPrompt).trim()) || props.busy === "image-asset" || props.busy === "video-asset" || (assetKind === "video" && (!videoAvailable || !props.videoPlan))}>{props.busy === `${assetKind}-asset` ? <LoaderCircle className="spin" size={15} /> : assetKind === "image" ? <ImageIcon size={15} /> : <FileVideo size={15} />}{assetKind === "image" ? "Generate image" : videoAvailable ? `Generate 15s · ${videoEstimateLabel}` : "Connect video provider"}</button>
               </form>
             ) : null}
             <div className="asset-list">
@@ -1087,7 +1106,7 @@ function CastStudio(props: CastStudioProps) {
                 <div className="asset-prompt-source"><span>IDENTITY SOURCE</span><strong>{activeReference?.label || "Approved cast portrait"}</strong></div>
               </div>
             ) : null}
-            <button className="motion-note" onClick={() => { setAssetKind("video"); setAssetComposerOpen(true); }}><Plus size={14} /><div><strong>Add a reusable motion clip</strong><span>{videoAvailable ? "Generate once, then reuse it across many stories." : "Connect OpenRouter later; your image workflow works now."}</span></div></button>
+            <button className="motion-note" onClick={() => { setAssetKind("video"); setAssetComposerOpen(true); }}><Plus size={14} /><div><strong>Add a reusable motion clip</strong><span>{videoAvailable ? `480p · ${videoEstimateLabel} estimated per 15s clip · reuse across many stories.` : "Connect OpenRouter later; your image workflow works now."}</span></div></button>
           </section>
 
           <section className="cast-preview-stage">

@@ -94,7 +94,7 @@ Once the still-based format is validated, the user may generate a small number o
 
 The studio’s **All cast assets** library is append-only from the user’s perspective. It lists the approved portrait, every derived portrait, every queued or completed video, and its status. **New cast asset** opens an explicit image/video composer. New images use the approved cast portrait as the identity source and exclude products, screenshots, logos, text, and collage elements. The video composer is visible but disabled with a clear explanation until an OpenRouter or fal credential is configured.
 
-The existing OpenRouter adapter discovers compatible models dynamically and supports asynchronous submission, polling, and retrieval. It remains inactive until the user explicitly chooses to add motion to the library. A fal adapter remains available as a later quality tier.
+The OpenRouter adapter supports asynchronous submission, polling, and retrieval. The current economy choice is `x-ai/grok-imagine-video-1.5-lite` at 480p: $0.02 per output second plus a $0.01 image-input charge, or about $0.31 for one 15-second clip at the price verified on October 14, 2026. A runtime price ceiling rejects or replaces any configured model above $0.03 per second. It remains inactive until the user explicitly chooses to add motion to the library. A fal adapter remains available as a later quality tier.
 
 ## 7. MVP scope
 
@@ -170,6 +170,8 @@ The existing OpenRouter adapter discovers compatible models dynamically and supp
 ### Future video adapter
 
 - OpenRouter remains the economy/default adapter because model choice and pricing can change without changing the editor.
+- The production credential is a server-only Vercel secret; no OpenRouter credential may appear in this document or repository.
+- Model discovery enforces 15-second, 9:16, 480p, first-frame image-to-video support and a maximum $0.03-per-second output rate.
 - A generated video is ingested into the reusable library, not bound to one reel.
 - The same library asset may be used across many text stories.
 - Hypecast never labels a video generated until the provider returns a playable result.

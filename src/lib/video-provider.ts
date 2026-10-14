@@ -31,8 +31,16 @@ export type VideoModelOption = {
   id: string;
   resolution: "480p";
   estimatedPerSecondUsd: number;
+  estimatedClipUsd: number;
   estimatedBatchUsd: number;
 };
+
+const DEFAULT_MAX_PER_SECOND_USD = 0.03;
+
+export function openRouterVideoPriceCap() {
+  const configured = Number(process.env.OPENROUTER_VIDEO_MAX_PER_SECOND_USD || DEFAULT_MAX_PER_SECOND_USD);
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_PER_SECOND_USD;
+}
 
 function estimate480p(model: OpenRouterModel) {
   const pricing = model.pricing_skus || {};
@@ -63,21 +71,33 @@ export async function listOpenRouterVideoOptions(): Promise<VideoModelOption[]> 
       const price = estimate480p(model);
       if (price === null) return [];
       const imageInput = Number(model.pricing_skus?.cents_per_image_input || 0) / 100;
+      const estimatedClipUsd = Number((price * 15 + imageInput).toFixed(2));
       return [{
         id: model.id,
         resolution: "480p" as const,
         estimatedPerSecondUsd: price,
-        estimatedBatchUsd: Number(((price * 15 + imageInput) * 3).toFixed(2)),
+        estimatedClipUsd,
+        estimatedBatchUsd: Number((estimatedClipUsd * 3).toFixed(2)),
       }];
     })
     .sort((a, b) => a.estimatedBatchUsd - b.estimatedBatchUsd);
 }
 
+export async function selectOpenRouterVideoOption() {
+  const options = await listOpenRouterVideoOptions();
+  const cap = openRouterVideoPriceCap();
+  const affordable = options.filter((option) => option.estimatedPerSecondUsd <= cap);
+  const configured = process.env.OPENROUTER_VIDEO_MODEL;
+  const selected = affordable.find((option) => option.id === configured) || affordable[0];
+  if (!selected) {
+    throw new Error(`No compatible OpenRouter video model is available at or below $${cap.toFixed(2)} per second.`);
+  }
+  return selected;
+}
+
 class OpenRouterVideoProvider implements VideoProvider {
   private async selectedModel() {
-    if (process.env.OPENROUTER_VIDEO_MODEL) return process.env.OPENROUTER_VIDEO_MODEL;
-    const options = await listOpenRouterVideoOptions();
-    return options[0]?.id || "x-ai/grok-imagine-video-1.5-lite";
+    return (await selectOpenRouterVideoOption()).id;
   }
 
   private get headers() {
