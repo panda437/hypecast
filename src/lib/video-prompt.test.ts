@@ -2,22 +2,16 @@ import { describe, expect, it } from "vitest";
 import { composeVideoPrompt } from "./video-prompt";
 
 describe("the CueFace image-to-video prompt", () => {
-  it("locks every clip to the supplied character image", () => {
+  it("keeps the reference-person likeness without over-directing the model", () => {
     const prompt = composeVideoPrompt("The creator blinks once and gives a restrained smile.");
-    expect(prompt).toContain("supplied start image as the strict identity reference and first frame");
-    expect(prompt).toContain("exact same single person");
-    expect(prompt).toContain("only person allowed in the video");
+    expect(prompt).toContain("reference image to preserve the same person's likeness");
     expect(prompt).toContain("The creator blinks once and gives a restrained smile.");
-    expect(prompt).toContain("No speaking, lip-sync, identity drift");
-    expect(prompt).toContain("additional person");
-    expect(prompt).toContain("within the first half-second");
-    expect(prompt).toContain("continuous 15-second shot");
-    expect(prompt).toContain("no cuts, resets, repeated action");
-    expect(prompt).not.toContain("loop");
+    expect(prompt).toContain("natural 15-second silent video");
+    expect(prompt).toContain("No extra people, speaking, text, logos, or watermarks");
+    expect(prompt).not.toMatch(/first frame|first half-second|seconds 0|seconds 5|seconds 10|no cuts|wardrobe change/i);
   });
 
   it("trims the editable motion direction before submission", () => {
-    expect(composeVideoPrompt("  A slow, natural breath.  ")).toContain("MOTION DIRECTION:\nA slow, natural breath.\n");
-    expect(composeVideoPrompt("A camera arc.")).toContain("seconds 10–14");
+    expect(composeVideoPrompt("  A slow, natural breath.  ")).toContain("MOTION:\nA slow, natural breath.\n");
   });
 });

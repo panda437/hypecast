@@ -1334,7 +1334,7 @@ function CastStudio(props: CastStudioProps) {
                       ))}
                     </div>
                     <div className="motion-source-note"><div><span>SOURCE CHECK</span><p>{selectedRecipe.sourceNote}</p></div>{selectedRecipe.requiresNewImage ? <button type="button" onClick={() => { setImageDirection(selectedRecipe.imageDirection); void props.onGenerateImage(selectedRecipe.imageDirection); }} disabled={props.busy === "image-asset"}>{props.busy === "image-asset" ? <LoaderCircle className="spin" size={13} /> : <ImageIcon size={13} />} Use image credits · create car still</button> : null}</div>
-                    <label><span>FINAL MOTION PROMPT · EDIT ANYTHING</span><textarea value={motionPrompt} rows={7} onChange={(event) => setMotionPrompt(event.target.value)} /><small>The exact identity-locked prompt is saved with the clip. No credits are used while you edit this.</small></label>
+                    <label><span>FINAL MOTION PROMPT · EDIT ANYTHING</span><textarea value={motionPrompt} rows={7} onChange={(event) => setMotionPrompt(event.target.value)} /><small>Your motion plus a short likeness note is saved with the clip. No credits are used while you edit this.</small></label>
                     <details className="provider-prompt-preview"><summary>View exact provider prompt</summary><p>{providerPromptPreview}</p></details>
                     <div className="motion-duration"><span>PAID GENERATION LENGTH</span><div className="motion-duration-card"><strong>15s continuous motion</strong><small>{videoEstimateLabel} est. · one full generation · no repeated segment</small></div></div>
                     <p className="motion-spend-note">Credits are used only when you press the generation button below.</p>
