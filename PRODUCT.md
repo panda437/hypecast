@@ -61,6 +61,8 @@ The selected candidate portrait becomes the first reusable background asset. The
 
 The user approves the portrait before composition. Future image or video additions must preserve its character bible.
 
+Every future video is image-to-video. The approved cast portrait, or an approved still derived from it, is required as the identity source. Hypecast shows the editable motion direction and the complete identity-locked provider prompt before spending credits. After submission, the exact prompt and source image remain visible and saved with the video asset.
+
 ### Step 5 — Add the $0 background
 
 Hypecast places the portrait in the project’s background library as a 15-second still-based asset. The browser preview and exporter apply a gentle push-in so the result does not feel completely static.

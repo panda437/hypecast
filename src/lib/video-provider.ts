@@ -8,6 +8,7 @@ export type SubmitVideoInput = {
 export type VideoJobResult = {
   requestId: string;
   status: "queued" | "generating" | "ready" | "failed";
+  generationPrompt?: string;
   videoUrl?: string;
   error?: string;
 };

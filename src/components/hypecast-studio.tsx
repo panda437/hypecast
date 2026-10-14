@@ -781,6 +781,7 @@ type CastStudioProps = {
 function CastStudio(props: CastStudioProps) {
   const { workspace, creator, selectedReel } = props;
   const [editingReelId, setEditingReelId] = useState<string | null>(null);
+  const activeReference = workspace.references.find((reference) => reference.id === props.activeClip?.referenceImageId);
   const story = selectedReel?.cards[0]?.text || "";
   const wordCount = story.trim() ? story.trim().split(/\s+/).length : 0;
   const exporting = selectedReel ? Boolean(props.exportProgress[selectedReel.id] && props.exportProgress[selectedReel.id] < 100) : false;
@@ -817,6 +818,13 @@ function CastStudio(props: CastStudioProps) {
             <div className="asset-list">
               {workspace.clips.map((clip) => <button key={clip.id} className={props.selectedAssetId === clip.id || selectedReel?.clipId === clip.id ? "is-selected" : ""} onClick={() => props.onSelectAsset(clip.id)}><div>{clip.videoUrl ? <video src={clip.videoUrl} muted playsInline /> : <img src={clip.posterUrl} alt="" />}{clip.videoUrl ? <FileVideo size={13} /> : <ImageIcon size={13} />}</div><span>{clip.label}</span><small>{clip.provider === "still" ? "$0 · subtle push-in" : `${clip.provider} · reusable`}</small></button>)}
             </div>
+            {props.activeClip ? (
+              <div className="asset-prompt-card">
+                <div className="asset-prompt-head"><span>{props.activeClip.provider === "still" ? "MOTION RECIPE" : "EXACT VIDEO PROMPT"}</span><small>{props.activeClip.provider === "still" ? "$0 · local effect" : "Saved with this asset"}</small></div>
+                <p>{props.activeClip.generationPrompt || props.activeClip.motionPrompt}</p>
+                <div className="asset-prompt-source"><span>IDENTITY SOURCE</span><strong>{activeReference?.label || "Approved cast portrait"}</strong></div>
+              </div>
+            ) : null}
             <div className="motion-note"><Plus size={14} /><div><strong>Add motion in run two</strong><span>Generate once, then reuse it across many stories.</span></div></div>
           </section>
 

@@ -47,6 +47,7 @@ export type VideoClip = {
   id: string;
   label: string;
   motionPrompt: string;
+  generationPrompt?: string;
   referenceImageId: string;
   provider: "still" | "openrouter" | "fal" | "demo";
   status: "idle" | "queued" | "generating" | "ready" | "failed";

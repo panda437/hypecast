@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getVideoProvider } from "@/lib/video-provider";
+import { composeVideoPrompt } from "@/lib/video-prompt";
 import { requireGenerationAccess, routeError } from "@/lib/server-auth";
 
 export const maxDuration = 60;
@@ -14,8 +15,9 @@ export async function POST(request: Request) {
   try {
     await requireGenerationAccess();
     const body = bodySchema.parse(await request.json());
-    const job = await getVideoProvider().submit({ ...body, duration: 15 });
-    return Response.json(job, { status: 202 });
+    const generationPrompt = composeVideoPrompt(body.prompt);
+    const job = await getVideoProvider().submit({ ...body, prompt: generationPrompt, duration: 15 });
+    return Response.json({ ...job, generationPrompt }, { status: 202 });
   } catch (error) {
     return routeError(error);
   }

@@ -437,6 +437,13 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .asset-list svg { position: absolute; left: 5px; bottom: 5px; padding: 3px; width: 20px; height: 20px; border-radius: 4px; background: rgba(0,0,0,.65); }
 .asset-list > button > span { align-self: end; font-size: 10px; }
 .asset-list > button > small { align-self: start; color: var(--dim); font-size: 8px; }
+.asset-prompt-card { margin-top: 10px; padding: 11px; border: 1px solid var(--line); border-radius: 8px; background: #141412; }
+.asset-prompt-head, .asset-prompt-source { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.asset-prompt-head span, .asset-prompt-source span { color: var(--dim); font: 650 7px/1 var(--font-mono); letter-spacing: .1em; }
+.asset-prompt-head small { color: var(--accent); font-size: 7px; }
+.asset-prompt-card > p { margin: 9px 0 11px; color: var(--muted); font-size: 8px; line-height: 1.5; }
+.asset-prompt-source { padding-top: 9px; border-top: 1px solid var(--line-soft); }
+.asset-prompt-source strong { overflow: hidden; color: var(--ink); font-size: 8px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
 .motion-note { margin-top: 10px; display: flex; gap: 8px; padding: 11px; border: 1px dashed var(--line); border-radius: 8px; color: var(--dim); }
 .motion-note strong, .motion-note span { display: block; }
 .motion-note strong { color: var(--muted); font-size: 9px; }
