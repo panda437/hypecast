@@ -2,7 +2,7 @@ import type { Reel, VideoClip } from "@/lib/types";
 
 const WIDTH = 720;
 const HEIGHT = 1280;
-const DURATION = 17;
+const DURATION = 15;
 
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
   ctx.beginPath();
@@ -10,34 +10,45 @@ function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width:
 }
 
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
-  const words = text.split(/\s+/);
   const lines: string[] = [];
-  let line = "";
-  for (const word of words) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (ctx.measureText(candidate).width > maxWidth && line) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = candidate;
+  for (const paragraph of text.split(/\n+/)) {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean);
+    let line = "";
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (ctx.measureText(candidate).width > maxWidth && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = candidate;
+      }
     }
+    if (line) lines.push(line);
+    if (paragraph !== text.split(/\n+/).at(-1)) lines.push("");
   }
-  if (line) lines.push(line);
-  return lines.slice(0, 6);
+  return lines;
 }
 
 function drawOverlay(ctx: CanvasRenderingContext2D, reel: Reel, time: number) {
   const card = reel.cards.find((item) => time >= item.start && time < item.end) || reel.cards[0];
   if (!card) return;
-  const fontSize = card.text.length > 92 ? 50 : card.text.length > 58 ? 58 : 68;
-  ctx.font = `800 ${fontSize}px Arial, sans-serif`;
-  ctx.textAlign = "center";
+  const isStory = card.text.length > 180;
+  let fontSize = isStory ? 34 : card.text.length > 92 ? 48 : card.text.length > 58 ? 56 : 66;
+  let lines: string[] = [];
+  const maxWidth = WIDTH - 132;
+  const maxHeight = 880;
+  do {
+    ctx.font = `${isStory ? 650 : 800} ${fontSize}px Arial, sans-serif`;
+    lines = wrapText(ctx, card.text, maxWidth);
+    if (lines.length * fontSize * (isStory ? 1.24 : 1.1) <= maxHeight) break;
+    fontSize -= 2;
+  } while (fontSize > 23);
+  ctx.textAlign = isStory ? "left" : "center";
   ctx.textBaseline = "middle";
-  const lines = wrapText(ctx, card.text, WIDTH - 130);
-  const lineHeight = fontSize * 1.1;
-  const blockHeight = lines.length * lineHeight + 58;
+  const lineHeight = fontSize * (isStory ? 1.24 : 1.1);
+  const blockHeight = Math.min(maxHeight + 54, lines.length * lineHeight + 58);
   const centerY = reel.position === "top" ? 310 : reel.position === "bottom" ? 900 : 625;
-  const top = centerY - blockHeight / 2;
+  const top = Math.max(122, Math.min(HEIGHT - 142 - blockHeight, centerY - blockHeight / 2));
 
   if (reel.style === "glass") {
     ctx.fillStyle = "rgba(8, 8, 10, .64)";
@@ -54,8 +65,9 @@ function drawOverlay(ctx: CanvasRenderingContext2D, reel: Reel, time: number) {
   ctx.fillStyle = "#fffdf7";
   lines.forEach((line, index) => {
     const y = top + 29 + lineHeight / 2 + index * lineHeight;
-    if (reel.style === "clean") ctx.strokeText(line, WIDTH / 2, y);
-    ctx.fillText(line, WIDTH / 2, y);
+    const x = isStory ? 70 : WIDTH / 2;
+    if (reel.style === "clean") ctx.strokeText(line, x, y);
+    ctx.fillText(line, x, y);
   });
 }
 

@@ -2,7 +2,7 @@
 
 ## 1. Product thesis
 
-Hypecast turns one app URL into a reusable AI creator and five downloadable Instagram Reels. The first run deliberately does **not** generate AI video: it reuses the approved creator portrait as a 17-second 9:16 background and adds a subtle local push-in during export.
+Hypecast turns one app URL into a reusable AI creator and five downloadable Instagram Reels. The first run deliberately does **not** generate AI video: it reuses the approved creator portrait as a 15-second 9:16 background and adds a subtle local push-in during export.
 
 This tests whether the creator, hook, and product story earn attention before paying for motion. AI-generated background videos become optional reusable library assets in the second run. “Thirty reels per month” remains a future goal, not the Build Week promise.
 
@@ -12,7 +12,7 @@ When a founder needs organic reach, they want enough credible posts to test seve
 
 The first product promise is:
 
-> Paste a product link, approve the story, select an AI creator, and export five editable 17-second reels with zero video-generation spend.
+> Paste a product link, approve the direction, select an AI creator, and export five editable 15-second story reels with zero video-generation spend.
 
 ## 3. Target user and trigger
 
@@ -26,14 +26,20 @@ The first product promise is:
 
 - **Background:** the exact approved creator portrait.
 - **Motion:** a slow local push-in rendered in the browser; no video model call.
-- **Foreground:** one hook or up to three timed text cards.
-- **Duration:** 17 seconds.
+- **Foreground:** one continuous story overlay, editable as a single text block.
+- **Duration:** 15 seconds.
 - **Frame:** 9:16 portrait with Instagram-safe text zones.
 - **Audio:** none; platform-native music can be added when posting.
 - **Output:** five H.264 MP4 files.
 - **Video-generation cost:** $0.
 
 ## 5. End-to-end flow
+
+The product has three intentionally distinct surfaces:
+
+- **Public homepage:** explains the promise, shows the real studio workflow, and offers sign-in or a zero-credit demo. It is not the editor.
+- **Cast onboarding:** a focused three-decision flow for product, creative direction, and cast selection.
+- **Cast studio:** the persistent signed-in workspace for the selected creator, reusable background library, story batch, live preview, editing, and export.
 
 ### Step 1 — Sign in
 
@@ -57,21 +63,21 @@ The user approves the portrait before composition. Future image or video additio
 
 ### Step 5 — Add the $0 background
 
-Hypecast places the portrait in the project’s background library as a 17-second still-based asset. The browser preview and exporter apply a gentle push-in so the result does not feel completely static.
+Hypecast places the portrait in the project’s background library as a 15-second still-based asset. The browser preview and exporter apply a gentle push-in so the result does not feel completely static.
 
 No OpenRouter, fal, or other video request occurs in this step.
 
 ### Step 6 — Compose five reels
 
-AI writes five product-specific hook stories. All five may reuse the same portrait because hook performance—not background variety—is the first hypothesis.
+AI writes five product-native narrative stories. The setting depends on the product and audience; the reusable structure is a specific incident, escalating details, a natural product role, and a sharp final reversal. All five may reuse the same portrait because story performance—not background variety—is the first hypothesis.
 
 The user can:
 
 - edit the exact text;
-- use one full-duration overlay or up to three timed cards;
+- edit one full-duration story overlay shown throughout the reel;
 - choose top, center, or bottom safe-zone placement;
 - choose the text treatment;
-- preview the 17-second reel;
+- preview the 15-second reel;
 - export the current edit as a silent MP4.
 
 ## 6. Second-run background library
@@ -90,9 +96,9 @@ The existing OpenRouter adapter discovers compatible models dynamically and supp
 - Safe public URL validation, extraction, and editable AI analysis.
 - Five creator candidates and one explicit selection.
 - Reuse of the selected portrait without extra reference-image generation.
-- One 17-second still-based background asset.
+- One 15-second still-based background asset.
 - Five AI-written reel stories.
-- Editable safe-zone overlays and timed cards.
+- One editable full-duration safe-zone story overlay per reel.
 - In-browser preview.
 - Downloadable silent 9:16 H.264 MP4 export.
 - Local persistence plus authenticated Convex project/asset persistence.
@@ -108,7 +114,7 @@ The existing OpenRouter adapter discovers compatible models dynamically and supp
 - Thirty generated reels per month.
 - Automated Instagram account creation or posting.
 - Music, voiceover, dialogue, or lip-sync.
-- A CapCut-style timeline editor.
+- A CapCut-style timeline editor or timed multi-card text.
 - Multiple creator identities per project.
 - Analytics and automatic hook optimization.
 - Dodopayments, subscriptions, credits, and invoices.
@@ -144,7 +150,7 @@ The existing OpenRouter adapter discovers compatible models dynamically and supp
 ### Export
 
 - The browser draws the portrait, local push-in, and current text state into a 720×1280 canvas.
-- MediaBunny encodes a silent 17-second H.264 MP4.
+- MediaBunny encodes a silent 15-second H.264 MP4.
 - A file is complete only after the browser returns a real downloadable buffer.
 
 ### Future video adapter
@@ -173,9 +179,9 @@ The first-run MVP is accepted only if a user can:
 3. Edit and approve the AI brief.
 4. See five creator candidates and select one.
 5. Lock that existing portrait without triggering more reference-image calls.
-6. Add the portrait as a ready 17-second background without a video-provider call.
-7. Receive five relevant hook stories.
-8. Edit text and timing within the 17-second canvas.
+6. Add the portrait as a ready 15-second background without a video-provider call.
+7. Receive five relevant product-native stories with the approved narrative structure.
+8. Edit the one continuous text block shown throughout the 15-second canvas.
 9. Preview the same approved portrait behind every reel.
 10. Download five silent MP4 files matching the current edits.
 11. Reload and resume without losing approved decisions.
@@ -205,7 +211,7 @@ Technical acceptance also requires:
 
 The critical hypothesis is:
 
-> A credible creator portrait plus a product-specific timed text story is enough to learn whether the content angle earns attention—without paying for generated motion.
+> A credible creator portrait plus a product-specific static text story is enough to learn whether the content angle earns attention—without paying for generated motion.
 
 A useful initial signal is one of five posts reaching 500 organic views or clearly outperforming the founder’s recent median without trust backlash.
 
@@ -214,7 +220,7 @@ A useful initial signal is one of five posts reaching 500 organic views or clear
 1. Pick one Build Week product with founder permission.
 2. Approve one creator portrait.
 3. Write five grounded hooks.
-4. Export five 17-second still-based reels using the same portrait.
+4. Export five 15-second still-based reels using the same portrait.
 5. Post one per day with native Instagram audio.
 6. Record 24-hour and 72-hour views, completion rate, shares, saves, profile visits, and link clicks.
 7. Ask whether motion quality—not hook or positioning—was the main reason for weak performance.

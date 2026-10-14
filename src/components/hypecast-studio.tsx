@@ -2,14 +2,14 @@
 /* eslint-disable @next/next/no-img-element */
 
 import {
+  ArrowRight,
   Check,
-  ChevronRight,
   CircleAlert,
-  Clapperboard,
   Download,
-  ExternalLink,
-  Film,
+  FileVideo,
   ImageIcon,
+  LayoutGrid,
+  Library,
   LoaderCircle,
   LogIn,
   Play,
@@ -28,6 +28,7 @@ import type {
   CreatorCandidate,
   ProductBrief,
   Reel,
+  ReferenceImage,
   VideoClip,
   WorkspaceSnapshot,
 } from "@/lib/types";
@@ -35,15 +36,8 @@ import { ReelPreview } from "@/components/reel-preview";
 import { CloudProjectSync } from "@/components/cloud-project-sync";
 
 const STORAGE_KEY = "hypecast-project-v2";
-
-const steps = [
-  ["Brief", "Know the product"],
-  ["Persona", "Approve the angle"],
-  ["Cast", "Choose one creator"],
-  ["Portrait", "Lock the still"],
-  ["Background", "Reuse at $0"],
-  ["Reels", "Edit and export"],
-];
+const REEL_DURATION = 15;
+const onboardingSteps = ["Product", "Direction", "Cast"];
 
 const emptyWorkspace: WorkspaceSnapshot = {
   mode: "demo",
@@ -56,16 +50,46 @@ const emptyWorkspace: WorkspaceSnapshot = {
   updatedAt: Date.now(),
 };
 
+const homepageReferences = demoReferences(demoCreators[0]);
+const homepageClips = demoClips(homepageReferences);
+const homepageReel = demoReels(homepageClips)[0];
+
 function pause(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function statusLabel(status: VideoClip["status"]) {
-  if (status === "generating") return "Generating";
-  if (status === "queued") return "Queued";
-  if (status === "ready") return "Ready";
-  if (status === "failed") return "Failed";
-  return "Not started";
+function stillClip(reference: ReferenceImage): VideoClip {
+  return {
+    id: "clip-still",
+    label: "Creator portrait · 15s",
+    motionPrompt: "A gentle local push-in gives the still subtle motion without a video-generation call.",
+    referenceImageId: reference.id,
+    provider: "still",
+    status: "ready",
+    posterUrl: reference.imageDataUrl,
+  };
+}
+
+function normalizeWorkspace(saved: WorkspaceSnapshot): WorkspaceSnapshot {
+  const references = Array.isArray(saved.references) ? saved.references : [];
+  let clips = Array.isArray(saved.clips)
+    ? saved.clips.map((clip) => ({ ...clip, label: clip.label.replace("17s", "15s") }))
+    : [];
+  if (saved.selectedCreatorId && clips.length === 0 && references[0]?.imageDataUrl) {
+    clips = [stillClip(references[0])];
+  }
+  const reels = (Array.isArray(saved.reels) ? saved.reels : []).map((reel) => {
+    const story = reel.cards?.map((card) => card.text.trim()).filter(Boolean).join("\n\n") || reel.hook;
+    return {
+      ...reel,
+      hook: story.split(/[.!?]/)[0] || story,
+      cards: [{ id: `${reel.id}-story`, text: story, start: 0, end: REEL_DURATION }],
+      position: reel.position || "center",
+      style: reel.style || "glass",
+    } satisfies Reel;
+  });
+  const step = Number(saved.step) > 3 ? 3 : Math.max(0, Number(saved.step) || 0);
+  return { ...emptyWorkspace, ...saved, references, clips, reels, step, updatedAt: Date.now() };
 }
 
 export function HypecastStudio() {
@@ -76,13 +100,14 @@ export function HypecastStudio() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [selectedReelId, setSelectedReelId] = useState("");
+  const [selectedAssetId, setSelectedAssetId] = useState("");
   const [exportProgress, setExportProgress] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const hydrateTimer = window.setTimeout(() => {
       try {
         const saved = window.localStorage.getItem(STORAGE_KEY);
-        if (saved) setWorkspace(JSON.parse(saved));
+        if (saved) setWorkspace(normalizeWorkspace(JSON.parse(saved) as WorkspaceSnapshot));
       } catch {
         window.localStorage.removeItem(STORAGE_KEY);
       }
@@ -111,7 +136,8 @@ export function HypecastStudio() {
     [selectedReelId, workspace.reels],
   );
   const activeClip = useMemo(() => {
-    const clip = workspace.clips.find((item) => item.id === selectedReel?.clipId) || workspace.clips[0];
+    const clipId = selectedReel?.clipId || selectedAssetId;
+    const clip = workspace.clips.find((item) => item.id === clipId) || workspace.clips[0];
     if (clip) return clip;
     if (selectedCreator?.imageDataUrl) {
       return {
@@ -125,7 +151,7 @@ export function HypecastStudio() {
       };
     }
     return undefined;
-  }, [selectedCreator, selectedReel?.clipId, workspace.clips]);
+  }, [selectedAssetId, selectedCreator, selectedReel?.clipId, workspace.clips]);
 
   function updateWorkspace(patch: Partial<WorkspaceSnapshot>) {
     setWorkspace((current) => ({ ...current, ...patch, updatedAt: Date.now() }));
@@ -136,20 +162,14 @@ export function HypecastStudio() {
       if (kind === "candidate") {
         return {
           ...current,
-          creators: current.creators.map((creator) =>
-            creator.id === id ? { ...creator, imageDataUrl: url } : creator,
-          ),
+          creators: current.creators.map((creator) => creator.id === id ? { ...creator, imageDataUrl: url } : creator),
           updatedAt: Date.now(),
         };
       }
       return {
         ...current,
-        references: current.references.map((reference) =>
-          reference.id === id ? { ...reference, imageDataUrl: url } : reference,
-        ),
-        clips: current.clips.map((clip) =>
-          clip.referenceImageId === id ? { ...clip, posterUrl: url } : clip,
-        ),
+        references: current.references.map((reference) => reference.id === id ? { ...reference, imageDataUrl: url } : reference),
+        clips: current.clips.map((clip) => clip.referenceImageId === id ? { ...clip, posterUrl: url } : clip),
         updatedAt: Date.now(),
       };
     });
@@ -158,6 +178,7 @@ export function HypecastStudio() {
   function resetProject() {
     setWorkspace({ ...emptyWorkspace, updatedAt: Date.now() });
     setSelectedReelId("");
+    setSelectedAssetId("");
     setError("");
   }
 
@@ -168,7 +189,7 @@ export function HypecastStudio() {
     setBusy("analyzing");
     try {
       const { brief } = await apiRequest<{ brief: ProductBrief }>("/api/analyze", { url: workspace.productUrl });
-      updateWorkspace({ mode: "live", brief, step: 1, creators: [], references: [], clips: [], reels: [] });
+      updateWorkspace({ mode: "live", brief, step: 1, creators: [], selectedCreatorId: undefined, references: [], clips: [], reels: [] });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not analyze that page.");
     } finally {
@@ -188,6 +209,8 @@ export function HypecastStudio() {
       clips: [],
       reels: [],
     });
+    setSelectedReelId("");
+    setSelectedAssetId("");
     setError("");
   }
 
@@ -201,47 +224,37 @@ export function HypecastStudio() {
     setBusy("cast");
     setError("");
     if (workspace.mode === "demo") {
-      await pause(500);
+      await pause(450);
       updateWorkspace({ creators: demoCreators, step: 2 });
       setBusy("");
       return;
     }
     try {
-      const { creators } = await apiRequest<{ creators: CreatorCandidate[] }>("/api/creators", {
-        brief: workspace.brief,
-      });
+      const { creators } = await apiRequest<{ creators: CreatorCandidate[] }>("/api/creators", { brief: workspace.brief });
       updateWorkspace({ creators, step: 2 });
-      await Promise.allSettled(
-        creators.map(async (creator) => {
+      await Promise.allSettled(creators.map(async (creator) => {
+        setWorkspace((current) => ({
+          ...current,
+          creators: current.creators.map((item) => item.id === creator.id ? { ...item, imageStatus: "generating" } : item),
+        }));
+        try {
+          const { imageDataUrl } = await apiRequest<{ imageDataUrl: string }>("/api/image", {
+            kind: "candidate",
+            name: creator.name,
+            characterBible: creator.characterBible,
+            productName: workspace.brief?.productName,
+          });
           setWorkspace((current) => ({
             ...current,
-            creators: current.creators.map((item) =>
-              item.id === creator.id ? { ...item, imageStatus: "generating" } : item,
-            ),
+            creators: current.creators.map((item) => item.id === creator.id ? { ...item, imageDataUrl, imageStatus: "ready" } : item),
           }));
-          try {
-            const { imageDataUrl } = await apiRequest<{ imageDataUrl: string }>("/api/image", {
-              kind: "candidate",
-              name: creator.name,
-              characterBible: creator.characterBible,
-              productName: workspace.brief?.productName,
-            });
-            setWorkspace((current) => ({
-              ...current,
-              creators: current.creators.map((item) =>
-                item.id === creator.id ? { ...item, imageDataUrl, imageStatus: "ready" } : item,
-              ),
-            }));
-          } catch {
-            setWorkspace((current) => ({
-              ...current,
-              creators: current.creators.map((item) =>
-                item.id === creator.id ? { ...item, imageStatus: "failed" } : item,
-              ),
-            }));
-          }
-        }),
-      );
+        } catch {
+          setWorkspace((current) => ({
+            ...current,
+            creators: current.creators.map((item) => item.id === creator.id ? { ...item, imageStatus: "failed" } : item),
+          }));
+        }
+      }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not build the creator cast.");
     } finally {
@@ -253,80 +266,56 @@ export function HypecastStudio() {
     updateWorkspace({ selectedCreatorId: id });
   }
 
-  function lockPortrait() {
+  function openCastStudio() {
     if (!selectedCreator?.imageDataUrl) {
       setError("Choose a creator with a finished portrait first.");
       return;
     }
-    setError("");
     const references = workspace.mode === "demo"
       ? demoReferences(selectedCreator)
       : [{
           id: "ref-anchor",
-          label: "First-run portrait",
-          direction: "The approved creator image becomes the reusable 17-second still background.",
+          label: "Approved cast portrait",
+          direction: "The approved cast image becomes a reusable 15-second background.",
           imageDataUrl: selectedCreator.imageDataUrl,
           status: "ready" as const,
         }];
-    updateWorkspace({ references, step: 3 });
-  }
-
-  function prepareStillBackground() {
-    const reference = workspace.references[0];
-    if (!reference?.imageDataUrl || reference.status !== "ready") {
-      setError("Approve the creator portrait first.");
-      return;
-    }
+    const clips = workspace.mode === "demo" ? demoClips(references) : [stillClip(references[0])];
+    setSelectedAssetId(clips[0].id);
+    updateWorkspace({ references, clips, reels: [], step: 3 });
     setError("");
-    const clips = workspace.mode === "demo"
-      ? demoClips(workspace.references)
-      : [{
-          id: "clip-still",
-          label: "Creator portrait · 17s",
-          motionPrompt: "A gentle local push-in gives the still subtle motion without a video-generation call.",
-          referenceImageId: reference.id,
-          provider: "still" as const,
-          status: "ready" as const,
-          posterUrl: reference.imageDataUrl,
-        }];
-    updateWorkspace({ clips, step: 4 });
   }
 
   async function buildReels() {
     const readyClips = workspace.clips.filter((clip) => clip.status === "ready");
-    if (readyClips.length < 1 || !workspace.brief) {
-      setError("Approve the still background before writing reels.");
+    const chosenClip = readyClips.find((clip) => clip.id === selectedAssetId) || readyClips[0];
+    if (!chosenClip || !workspace.brief) {
+      setError("Choose a ready cast image or video before writing stories.");
       return;
     }
-    setBusy("reels");
+    setBusy("stories");
     setError("");
     try {
+      let reels: Reel[];
       if (workspace.mode === "demo") {
-        const reels = demoReels(readyClips);
-        updateWorkspace({ reels, step: 5 });
-        setSelectedReelId(reels[0].id);
+        await pause(420);
+        reels = demoReels([chosenClip]);
       } else {
-        const { hooks } = await apiRequest<{ hooks: Array<{ title: string; hook: string; followUp: string }> }>(
-          "/api/hooks",
-          workspace.brief,
-        );
-        const reels: Reel[] = hooks.map((item, index) => ({
+        const { hooks } = await apiRequest<{ hooks: Array<{ title: string; angle: string; story: string }> }>("/api/hooks", workspace.brief);
+        reels = hooks.map((item, index) => ({
           id: `reel-${index + 1}`,
           title: item.title,
-          clipId: readyClips[index % readyClips.length].id,
-          hook: item.hook,
-          cards: [
-            { id: `card-${index + 1}-a`, text: item.hook, start: 0, end: 8.5 },
-            { id: `card-${index + 1}-b`, text: item.followUp, start: 8.5, end: 17 },
-          ],
-          position: index % 3 === 0 ? "top" : index % 3 === 1 ? "center" : "bottom",
-          style: index % 3 === 0 ? "glass" : index % 3 === 1 ? "clean" : "highlight",
+          clipId: chosenClip.id,
+          hook: item.story.split(/[.!?]/)[0] || item.angle,
+          cards: [{ id: `reel-${index + 1}-story`, text: item.story, start: 0, end: REEL_DURATION }],
+          position: "center",
+          style: "glass",
         }));
-        updateWorkspace({ reels, step: 5 });
-        setSelectedReelId(reels[0].id);
       }
+      updateWorkspace({ reels, step: 3 });
+      setSelectedReelId(reels[0].id);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not write the reel hooks.");
+      setError(cause instanceof Error ? cause.message : "Could not write the story batch.");
     } finally {
       setBusy("");
     }
@@ -335,32 +324,21 @@ export function HypecastStudio() {
   function updateReel(reelId: string, patch: Partial<Reel>) {
     setWorkspace((current) => ({
       ...current,
-      reels: current.reels.map((reel) => (reel.id === reelId ? { ...reel, ...patch } : reel)),
+      reels: current.reels.map((reel) => reel.id === reelId ? { ...reel, ...patch } : reel),
+      updatedAt: Date.now(),
     }));
   }
 
-  function updateCard(reelId: string, cardId: string, patch: Partial<Reel["cards"][number]>) {
-    setWorkspace((current) => ({
-      ...current,
-      reels: current.reels.map((reel) =>
-        reel.id === reelId
-          ? { ...reel, cards: reel.cards.map((card) => (card.id === cardId ? { ...card, ...patch } : card)) }
-          : reel,
-      ),
-    }));
+  function updateStory(reel: Reel, text: string) {
+    updateReel(reel.id, {
+      hook: text.split(/[.!?]/)[0] || text,
+      cards: [{ id: reel.cards[0]?.id || `${reel.id}-story`, text, start: 0, end: REEL_DURATION }],
+    });
   }
 
-  function addTextCard(reel: Reel) {
-    if (reel.cards.length >= 3) return;
-    const start = reel.cards.length === 1 ? 8.5 : 11.5;
-    const cards = reel.cards.length === 1
-      ? [{ ...reel.cards[0], end: 8.5 }, { id: `${reel.id}-card-2`, text: "Add the next beat…", start, end: 17 }]
-      : [...reel.cards, { id: `${reel.id}-card-3`, text: "Finish the story…", start: 11.5, end: 17 }];
-    if (cards.length === 3) {
-      cards[0] = { ...cards[0], end: 5.5 };
-      cards[1] = { ...cards[1], start: 5.5, end: 11.5 };
-    }
-    updateReel(reel.id, { cards });
+  function chooseAsset(clipId: string) {
+    setSelectedAssetId(clipId);
+    if (selectedReel) updateReel(selectedReel.id, { clipId });
   }
 
   async function exportOne(reel: Reel) {
@@ -369,265 +347,322 @@ export function HypecastStudio() {
     setError("");
     setExportProgress((current) => ({ ...current, [reel.id]: 1 }));
     try {
-      await exportReel(reel, clip, (progress) =>
-        setExportProgress((current) => ({ ...current, [reel.id]: progress })),
-      );
+      await exportReel(reel, clip, (progress) => setExportProgress((current) => ({ ...current, [reel.id]: progress })));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "This browser could not export the reel.");
       setExportProgress((current) => ({ ...current, [reel.id]: 0 }));
     }
   }
 
-  const previewReel = selectedReel ||
-    (workspace.brief
-      ? ({
-          id: "preview",
-          title: "Preview",
-          clipId: activeClip?.id || "",
-          hook: workspace.brief.hookAngles[0] || workspace.brief.oneLiner,
-          cards: [{ id: "preview-card", text: workspace.brief.hookAngles[0] || workspace.brief.oneLiner, start: 0, end: 17 }],
-          position: "center",
-          style: "glass",
-        } satisfies Reel)
-      : undefined);
+  const previewReel = selectedReel || (workspace.brief ? ({
+    id: "preview",
+    title: "Story preview",
+    clipId: activeClip?.id || "",
+    hook: workspace.brief.hookAngles[0] || workspace.brief.oneLiner,
+    cards: [{
+      id: "preview-story",
+      text: "Your cast is ready. Choose a background, then Hypecast will write five specific stories with a real setup, a natural product cameo, and a sharp final line.",
+      start: 0,
+      end: REEL_DURATION,
+    }],
+    position: "center",
+    style: "glass",
+  } satisfies Reel) : undefined);
+
+  const experience = workspace.step === 3 && selectedCreator ? (
+    <CastStudio
+      workspace={workspace}
+      creator={selectedCreator}
+      clerkEnabled={clerkEnabled}
+      selectedReel={selectedReel}
+      selectedAssetId={selectedAssetId || activeClip?.id || ""}
+      activeClip={activeClip}
+      previewReel={previewReel}
+      busy={busy}
+      error={error}
+      exportProgress={exportProgress}
+      capabilities={capabilities}
+      onDismissError={() => setError("")}
+      onReset={resetProject}
+      onSelectReel={setSelectedReelId}
+      onSelectAsset={chooseAsset}
+      onUpdateStory={updateStory}
+      onUpdateReel={updateReel}
+      onBuildReels={buildReels}
+      onExport={exportOne}
+    />
+  ) : (
+    <CastOnboarding
+      workspace={workspace}
+      busy={busy}
+      error={error}
+      clerkEnabled={clerkEnabled}
+      onDismissError={() => setError("")}
+      onReset={resetProject}
+      onAnalyze={analyzeProduct}
+      onStartDemo={startDemo}
+      onUpdateWorkspace={updateWorkspace}
+      onUpdateBrief={updateBrief}
+      onCreateCast={createCast}
+      onChooseCreator={chooseCreator}
+      onOpenStudio={openCastStudio}
+    />
+  );
 
   return (
     <>
-      {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL ? (
-        <CloudProjectSync workspace={workspace} onAssetStored={handleAssetStored} />
-      ) : null}
-      <div className="app-shell">
-        <aside className="sidebar">
-          <button className="brand" onClick={resetProject} aria-label="Start a new Hypecast project">
-            <span className="brand-mark">H</span>
-            <span>HYPECAST</span>
-          </button>
-          <div className="sidebar-kicker">BUILD WEEK / 01</div>
-          <nav className="step-list" aria-label="Project steps">
-            {steps.map(([name, hint], index) => {
-              const isDone = workspace.step > index;
-              const isActive = workspace.step === index;
-              return (
-                <button
-                  key={name}
-                  className={`step-item ${isActive ? "is-active" : ""} ${isDone ? "is-done" : ""}`}
-                  onClick={() => index <= workspace.step && updateWorkspace({ step: index })}
-                  disabled={index > workspace.step}
-                >
-                  <span className="step-index">{isDone ? <Check size={13} /> : index + 1}</span>
-                  <span><strong>{name}</strong><small>{hint}</small></span>
-                </button>
-              );
-            })}
-          </nav>
-          <div className="sidebar-note">
-            <span className={`signal ${workspace.mode === "live" ? "signal--live" : ""}`} />
-            <div><strong>{workspace.mode === "live" ? "Live project" : "Demo project"}</strong><small>Saved in this browser</small></div>
-          </div>
-        </aside>
-
-        <main className="studio-main">
-          <header className="topbar">
-            <div className="crumbs"><span>Hypecast</span><ChevronRight size={14} /><strong>{workspace.brief?.productName || "New project"}</strong></div>
-            <div className="topbar-actions">
-              <span className="status-pill"><span className="signal signal--live" /> Autosaved</span>
-              {clerkEnabled ? (
-                <Show
-                  when="signed-in"
-                  fallback={
-                    <SignInButton mode="modal">
-                      <button className="button button--small"><LogIn size={14} /> Sign in</button>
-                    </SignInButton>
-                  }
-                >
-                  <UserButton />
-                </Show>
-              ) : <span className="status-pill">Local demo session</span>}
-            </div>
-          </header>
-
-          <div className="workspace-grid">
-            <section className="workspace-panel">
-              {error ? (
-                <div className="notice notice--error"><CircleAlert size={17} /><span>{error}</span><button onClick={() => setError("")}><X size={15} /></button></div>
-              ) : null}
-
-              {workspace.step === 0 ? (
-                <div className="intro-view">
-                  <span className="eyebrow">ONE LINK → ONE CREATOR → FIVE REELS</span>
-                  <h1>Make your product<br /><em>impossible to scroll past.</em></h1>
-                  <p className="intro-copy">Hypecast reads your product, casts an AI creator, and turns one approved portrait into five editable 17-second vertical reels—without paying for video generation.</p>
-                  <form className="url-form" onSubmit={analyzeProduct}>
-                    <label htmlFor="product-url">Your public product URL</label>
-                    <div className="url-input-wrap">
-                      <input
-                        id="product-url"
-                        type="url"
-                        value={workspace.productUrl}
-                        placeholder="https://yourproduct.com"
-                        onChange={(event) => updateWorkspace({ productUrl: event.target.value })}
-                        required
-                      />
-                      {clerkEnabled ? (
-                        <Show
-                          when="signed-in"
-                          fallback={
-                            <SignInButton mode="modal">
-                              <button type="button" className="button button--primary">
-                                <LogIn size={17} /> Sign in to build
-                              </button>
-                            </SignInButton>
-                          }
-                        >
-                          <button className="button button--primary" disabled={busy === "analyzing"}>
-                            {busy === "analyzing" ? <LoaderCircle className="spin" size={17} /> : <WandSparkles size={17} />}
-                            Build my brief
-                          </button>
-                        </Show>
-                      ) : (
-                        <button className="button button--primary" disabled={busy === "analyzing"}>
-                          {busy === "analyzing" ? <LoaderCircle className="spin" size={17} /> : <WandSparkles size={17} />}
-                          Build my brief
-                        </button>
-                      )}
-                    </div>
-                  </form>
-                  <div className="demo-row">
-                    <button className="text-button" onClick={startDemo}><Play size={15} /> Try the zero-credit demo</button>
-                    <span>No generation calls. Export adds a subtle local push-in.</span>
-                  </div>
-                  <div className="promise-grid">
-                    <div><strong>05</strong><span>editable reels</span></div>
-                    <div><strong>01</strong><span>reusable portrait</span></div>
-                    <div><strong>17s</strong><span>silent & vertical</span></div>
-                    <div><strong>$0</strong><span>video spend</span></div>
-                  </div>
-                </div>
-              ) : null}
-
-              {workspace.step === 1 && workspace.brief ? (
-                <div className="stage-view">
-                  <StageHeader number="01" eyebrow="PRODUCT PERSONA" title="Make sure the story is true." description="This approved brief grounds every hook and visual decision. Edit anything that feels invented or generic." />
-                  <div className="source-chip"><ExternalLink size={14} /><span>{workspace.brief.source.title || workspace.brief.source.url}</span><a href={workspace.brief.source.url} target="_blank" rel="noreferrer">View source</a></div>
-                  <div className="form-grid">
-                    <label><span>Product name</span><input value={workspace.brief.productName} onChange={(e) => updateBrief("productName", e.target.value)} /></label>
-                    <label><span>Tone</span><input value={workspace.brief.tone} onChange={(e) => updateBrief("tone", e.target.value)} /></label>
-                    <label className="span-2"><span>What it is</span><textarea rows={2} value={workspace.brief.oneLiner} onChange={(e) => updateBrief("oneLiner", e.target.value)} /></label>
-                    <label className="span-2"><span>Who stops scrolling</span><textarea rows={2} value={workspace.brief.audience} onChange={(e) => updateBrief("audience", e.target.value)} /></label>
-                    <label className="span-2"><span>Pain worth naming</span><textarea rows={2} value={workspace.brief.problem} onChange={(e) => updateBrief("problem", e.target.value)} /></label>
-                  </div>
-                  <div className="hook-board">
-                    <div className="section-label"><span>HOOK TERRITORIES</span><small>Grounded in the landing page</small></div>
-                    {workspace.brief.hookAngles.map((hook, index) => <div className="hook-row" key={hook}><span>{String(index + 1).padStart(2, "0")}</span><p>{hook}</p></div>)}
-                  </div>
-                  <div className="stage-actions"><button className="button button--primary" onClick={createCast} disabled={busy === "cast"}>{busy === "cast" ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} Approve & cast five creators</button><small>Live mode uses 1 text + 5 image generations.</small></div>
-                </div>
-              ) : null}
-
-              {workspace.step === 2 ? (
-                <div className="stage-view">
-                  <StageHeader number="02" eyebrow="CREATOR CAST" title="Pick the face of the account." description="The selected portrait becomes the first reusable background and the identity anchor for future library clips." />
-                  <div className="creator-grid">
-                    {workspace.creators.map((creator) => (
-                      <button key={creator.id} className={`creator-card ${workspace.selectedCreatorId === creator.id ? "is-selected" : ""}`} onClick={() => creator.imageStatus === "ready" && chooseCreator(creator.id)} disabled={creator.imageStatus !== "ready"}>
-                        <div className="creator-image">
-                          {creator.imageDataUrl ? <img src={creator.imageDataUrl} alt={creator.name} /> : <div className="loading-tile"><LoaderCircle className={creator.imageStatus === "generating" ? "spin" : ""} /><span>{creator.imageStatus === "failed" ? "Image failed" : "Casting…"}</span></div>}
-                          {workspace.selectedCreatorId === creator.id ? <span className="selected-stamp"><Check size={15} /> LOCKED</span> : null}
-                        </div>
-                        <div className="creator-copy"><span>{creator.archetype}</span><h3>{creator.name}</h3><p>{creator.description}</p><small>{creator.wardrobe}</small></div>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="stage-actions"><button className="button button--primary" onClick={lockPortrait} disabled={!selectedCreator}><ImageIcon size={17} /> Lock this portrait</button><small>No extra reference-image generation in the first run.</small></div>
-                </div>
-              ) : null}
-
-              {workspace.step === 3 ? (
-                <div className="stage-view">
-                  <StageHeader number="03" eyebrow="FIRST-RUN PORTRAIT" title="One image. Five chances to win." description="The first batch reuses this exact portrait. Hypecast adds only a gentle local camera move during export, so video-generation spend stays at zero." />
-                  <div className="reference-grid reference-grid--single">
-                    {workspace.references.map((reference, index) => (
-                      <article className="reference-card" key={reference.id}>
-                        <div className="reference-image">{reference.imageDataUrl ? <img src={reference.imageDataUrl} alt={reference.label} /> : <div className="loading-tile"><LoaderCircle className={reference.status === "generating" ? "spin" : ""} /><span>{reference.status === "failed" ? "Generation failed" : "Generating reference"}</span></div>}<span className="reference-number">0{index + 1}</span></div>
-                        <div><strong>{reference.label}</strong><p>{reference.direction}</p><span className={`mini-status mini-status--${reference.status}`}>{reference.status}</span></div>
-                      </article>
-                    ))}
-                  </div>
-                  <div className="quality-callout"><Check size={17} /><div><strong>Budget check</strong><p>This portrait is already paid for. Reusing it across five hooks tests the content idea before spending anything on motion.</p></div></div>
-                  <div className="stage-actions"><button className="button button--primary" onClick={prepareStillBackground} disabled={workspace.references.some((reference) => reference.status !== "ready")}><Clapperboard size={17} /> Build the $0 background</button><small>Creates a 17-second still-based background locally.</small></div>
-                </div>
-              ) : null}
-
-              {workspace.step === 4 ? (
-                <div className="stage-view">
-                  <StageHeader number="04" eyebrow="BACKGROUND LIBRARY" title="Start with the image you already have." description="This portrait is the first reusable library asset. In run two, optional AI video generations can be added here once and reused across future reels." />
-                  <div className="clip-list">
-                    {workspace.clips.map((clip, index) => (
-                      <article className="clip-row" key={clip.id}>
-                        <div className="clip-thumb">{clip.videoUrl ? <video src={clip.videoUrl} muted loop autoPlay playsInline /> : clip.posterUrl ? <img src={clip.posterUrl} alt="" /> : null}<span>0{index + 1}</span></div>
-                        <div className="clip-copy"><span>{clip.label}</span><h3>{clip.motionPrompt.split(".")[0]}</h3><p>{clip.provider === "still" ? "Still-based · 9:16 · 17 seconds · $0 video generation" : `${clip.provider} library asset · audio off`}</p>{clip.error ? <small className="error-copy">{clip.error}</small> : null}</div>
-                        <div className={`job-status job-status--${clip.status}`}>{clip.status === "queued" || clip.status === "generating" ? <LoaderCircle className="spin" size={15} /> : clip.status === "ready" ? <Check size={15} /> : <CircleAlert size={15} />} {statusLabel(clip.status)}</div>
-                      </article>
-                    ))}
-                  </div>
-                  <div className="stage-actions"><button className="button button--primary" onClick={buildReels} disabled={workspace.clips.filter((clip) => clip.status === "ready").length < 1 || busy === "reels"}>{busy === "reels" ? <LoaderCircle className="spin" size={17} /> : <Film size={17} />} Write five reels</button><small>The same asset can support many hook tests.</small></div>
-                </div>
-              ) : null}
-
-              {workspace.step === 5 && selectedReel ? (
-                <div className="stage-view editor-view">
-                  <StageHeader number="05" eyebrow="REEL EDITOR" title="Five hooks. Ready to earn attention." description="Every change below is reflected in the preview and burned into the exported MP4." />
-                  <div className="reel-tabs">{workspace.reels.map((reel, index) => <button key={reel.id} className={selectedReel.id === reel.id ? "is-active" : ""} onClick={() => setSelectedReelId(reel.id)}><span>0{index + 1}</span>{reel.title}</button>)}</div>
-                  <div className="editor-form">
-                    <div className="section-label"><span>TEXT STORY</span><small>{selectedReel.cards.length}/3 timed cards</small></div>
-                    {selectedReel.cards.map((card, index) => (
-                      <div className="text-card-editor" key={card.id}>
-                        <span className="card-index">0{index + 1}</span>
-                        <textarea value={card.text} onChange={(event) => updateCard(selectedReel.id, card.id, { text: event.target.value })} rows={2} />
-                        <label>FROM<input type="number" min="0" max="17" step="0.5" value={card.start} onChange={(event) => updateCard(selectedReel.id, card.id, { start: Number(event.target.value) })} /></label>
-                        <label>TO<input type="number" min="0" max="17" step="0.5" value={card.end} onChange={(event) => updateCard(selectedReel.id, card.id, { end: Number(event.target.value) })} /></label>
-                      </div>
-                    ))}
-                    <button className="text-button" onClick={() => addTextCard(selectedReel)} disabled={selectedReel.cards.length >= 3}><Plus size={15} /> Add timed text change</button>
-                    <div className="editor-controls">
-                      <label><span>Background clip</span><select value={selectedReel.clipId} onChange={(event) => updateReel(selectedReel.id, { clipId: event.target.value })}>{workspace.clips.map((clip) => <option key={clip.id} value={clip.id}>{clip.label}</option>)}</select></label>
-                      <label><span>Position</span><select value={selectedReel.position} onChange={(event) => updateReel(selectedReel.id, { position: event.target.value as Reel["position"] })}><option value="top">Top safe zone</option><option value="center">Center</option><option value="bottom">Bottom safe zone</option></select></label>
-                      <label><span>Text treatment</span><select value={selectedReel.style} onChange={(event) => updateReel(selectedReel.id, { style: event.target.value as Reel["style"] })}><option value="glass">Smoked glass</option><option value="clean">Clean outline</option><option value="highlight">Hype orange</option></select></label>
-                    </div>
-                  </div>
-                  <div className="stage-actions"><button className="button button--primary" onClick={() => exportOne(selectedReel)} disabled={Boolean(exportProgress[selectedReel.id] && exportProgress[selectedReel.id] < 100)}>{exportProgress[selectedReel.id] && exportProgress[selectedReel.id] < 100 ? <LoaderCircle className="spin" size={17} /> : <Download size={17} />} {exportProgress[selectedReel.id] && exportProgress[selectedReel.id] < 100 ? `Encoding ${exportProgress[selectedReel.id]}%` : "Export MP4"}</button><small>17-second silent H.264 MP4 with a local push-in and burned-in text.</small></div>
-                </div>
-              ) : null}
-            </section>
-
-            <aside className="preview-panel">
-              <div className="preview-head"><div><span>LIVE PREVIEW</span><strong>Sound off by design</strong></div><span className="format-chip">9:16 · 17s</span></div>
-              <ReelPreview reel={previewReel} clip={activeClip} />
-              <div className="preview-meta">
-                <div><span>CREATOR</span><strong>{selectedCreator?.name || "Not cast yet"}</strong></div>
-                <div><span>BATCH</span><strong>{workspace.reels.length ? `${workspace.reels.length}/5 ready` : "Not composed"}</strong></div>
-              </div>
-              <div className="system-status">
-                <span className="section-label">SYSTEM CHECK</span>
-                <div><span>OpenAI</span><strong className={capabilities?.openai ? "ok" : "muted"}>{capabilities?.openai ? "Ready" : "Missing"}</strong></div>
-                <div><span>First-run video</span><strong className="ok">$0 still mode</strong></div>
-                <div><span>Motion library</span><strong className={capabilities?.openrouter || capabilities?.fal ? "ok" : "muted"}>{capabilities?.openrouter ? "OpenRouter optional" : capabilities?.fal ? "fal.ai optional" : "Add in run two"}</strong></div>
-                <div><span>Database</span><strong className={capabilities?.convex ? "ok" : "muted"}>{capabilities?.convex ? "Convex ready" : "Local only"}</strong></div>
-                <div><span>Login</span><strong className={capabilities?.clerk ? "ok" : "muted"}>{capabilities?.clerk ? "Protected" : "Not connected"}</strong></div>
-              </div>
-            </aside>
-          </div>
-        </main>
-      </div>
+      {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL ? <CloudProjectSync workspace={workspace} onAssetStored={handleAssetStored} /> : null}
+      {clerkEnabled ? (
+        <>
+          <Show when="signed-out">{workspace.step === 0 ? <MarketingHome clerkEnabled onStartDemo={startDemo} /> : experience}</Show>
+          <Show when="signed-in">{experience}</Show>
+        </>
+      ) : workspace.step === 0 ? <MarketingHome clerkEnabled={false} onStartDemo={startDemo} /> : experience}
     </>
   );
 }
 
-function StageHeader({ number, eyebrow, title, description }: { number: string; eyebrow: string; title: string; description: string }) {
-  return (
-    <header className="stage-header">
-      <div className="stage-number">{number}</div>
-      <div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2><p>{description}</p></div>
-    </header>
+function MarketingHome({ clerkEnabled, onStartDemo }: { clerkEnabled: boolean; onStartDemo: () => void }) {
+  const studioButton = clerkEnabled ? (
+    <SignInButton mode="modal"><button className="button button--primary home-cta">Open the studio <ArrowRight size={16} /></button></SignInButton>
+  ) : (
+    <button className="button button--primary home-cta" onClick={onStartDemo}>Open the demo studio <ArrowRight size={16} /></button>
   );
+
+  return (
+    <div className="hypecast-home">
+      <header className="home-nav">
+        <div className="brand"><span className="brand-mark">H</span><span>HYPECAST</span></div>
+        <nav><a href="#how-it-works">How it works</a><a href="#story-format">Story format</a></nav>
+        <div className="home-nav-actions">{clerkEnabled ? <SignInButton mode="modal"><button className="home-login">Log in</button></SignInButton> : null}{studioButton}</div>
+      </header>
+
+      <main>
+        <section className="home-hero">
+          <div className="home-hero-copy">
+            <span className="eyebrow">AI CREATOR STUDIO · BUILD WEEK MVP</span>
+            <h1>Give your product<br />a cast worth <em>following.</em></h1>
+            <p>Hypecast turns one product link into a consistent AI creator and five story-led reels. Pick the face once. Change the story as often as you want.</p>
+            <div className="home-hero-actions">{studioButton}<button className="text-button" onClick={onStartDemo}><Play size={15} /> Try the zero-credit demo</button></div>
+            <div className="home-proofline"><span>01 approved cast</span><span>05 editable stories</span><span>15s silent reels</span><span>$0 video generation</span></div>
+          </div>
+          <div className="home-product-shot" aria-label="Hypecast studio preview">
+            <div className="home-shot-top"><span>CAST / MAYA</span><strong>Story 01</strong><small>15 SEC</small></div>
+            <div className="home-shot-body">
+              <div className="home-shot-assets"><span>CAST LIBRARY</span>{demoCreators.slice(0, 3).map((creator, index) => <img key={creator.id} src={creator.imageDataUrl} alt="" className={index === 0 ? "is-active" : ""} />)}</div>
+              <ReelPreview reel={homepageReel} clip={homepageClips[0]} compact />
+              <div className="home-shot-story"><span>ONE STORY · FULL 15s</span><p>{homepageReel.cards[0].text}</p><button>Export MP4</button></div>
+            </div>
+          </div>
+        </section>
+
+        <section className="home-thesis" id="how-it-works">
+          <div><span className="eyebrow">THE CAST STAYS. THE STORIES CHANGE.</span><h2>Not another prompt box.<br />A repeatable creator workflow.</h2></div>
+          <div className="home-steps">
+            <article><span>01</span><h3>Read the product</h3><p>Hypecast turns your public page into an editable creative direction grounded in what the product actually does.</p></article>
+            <article><span>02</span><h3>Choose the cast</h3><p>Review five distinct creator candidates. The one you approve becomes the identity anchor for the account.</p></article>
+            <article><span>03</span><h3>Work in the studio</h3><p>Choose one cast image or reusable clip, write five stories, edit the exact text, preview, and export.</p></article>
+          </div>
+        </section>
+
+        <section className="home-story-format" id="story-format">
+          <div className="story-format-copy">
+            <span className="eyebrow">THE WRITING STANDARD</span>
+            <h2>A story first.<br />A product cameo second.</h2>
+            <p>The setting changes with the product, but the structure holds: start inside a specific situation, escalate through concrete details, let the product play a natural role, and end on the line that reframes everything.</p>
+            <div className="story-rhythm"><span>specific incident</span><ArrowRight size={14} /><span>escalation</span><ArrowRight size={14} /><span>natural product role</span><ArrowRight size={14} /><span>sharp reversal</span></div>
+          </div>
+          <blockquote>“the roadmap did not need more opinions. it needed receipts.”<span>Illustrative B2B demo story</span></blockquote>
+        </section>
+
+        <section className="home-final-cta">
+          <span className="eyebrow">ONE LINK → ONE CAST → FIVE REELS</span>
+          <h2>Build the account before<br />you buy the motion.</h2>
+          <p>Your first batch reuses the approved portrait with a subtle local push-in. Add paid video assets only when the stories prove they deserve them.</p>
+          {studioButton}
+        </section>
+      </main>
+      <footer className="home-footer"><div className="brand"><span className="brand-mark">H</span><span>HYPECAST</span></div><span>GrowthX Build Week MVP</span></footer>
+    </div>
+  );
+}
+
+type OnboardingProps = {
+  workspace: WorkspaceSnapshot;
+  busy: string;
+  error: string;
+  clerkEnabled: boolean;
+  onDismissError: () => void;
+  onReset: () => void;
+  onAnalyze: (event: FormEvent<HTMLFormElement>) => void;
+  onStartDemo: () => void;
+  onUpdateWorkspace: (patch: Partial<WorkspaceSnapshot>) => void;
+  onUpdateBrief: <K extends keyof ProductBrief>(key: K, value: ProductBrief[K]) => void;
+  onCreateCast: () => void;
+  onChooseCreator: (id: string) => void;
+  onOpenStudio: () => void;
+};
+
+function CastOnboarding(props: OnboardingProps) {
+  const { workspace, busy, error } = props;
+  const selectedCreator = workspace.creators.find((creator) => creator.id === workspace.selectedCreatorId);
+  return (
+    <div className="onboarding-shell">
+      <header className="studio-topbar">
+        <button className="brand" onClick={props.onReset}><span className="brand-mark">H</span><span>HYPECAST</span></button>
+        <div className="studio-topbar-title"><span>CREATOR ONBOARDING</span><strong>{workspace.brief?.productName || "New cast"}</strong></div>
+        {props.clerkEnabled ? <Show when="signed-in" fallback={<SignInButton mode="modal"><button className="button button--small"><LogIn size={14} /> Sign in</button></SignInButton>}><UserButton /></Show> : <span className="status-pill">Local demo</span>}
+      </header>
+
+      <main className="onboarding-main">
+        <aside className="onboarding-aside">
+          <span className="eyebrow">SET UP YOUR CAST</span>
+          <h2>Three decisions.<br />Then the studio.</h2>
+          <p>This is setup, not the product itself. Approve the product direction, choose one creator, then make every reel from their dedicated workspace.</p>
+          <div className="onboarding-steps">
+            {onboardingSteps.map((label, index) => <button key={label} className={`${workspace.step === index ? "is-active" : ""} ${workspace.step > index ? "is-done" : ""}`} disabled={index > workspace.step} onClick={() => props.onUpdateWorkspace({ step: index })}><span>{workspace.step > index ? <Check size={14} /> : `0${index + 1}`}</span><strong>{label}</strong></button>)}
+          </div>
+          <div className="onboarding-budget"><strong>$0 first-run video spend</strong><span>The selected portrait becomes the first reusable background.</span></div>
+        </aside>
+
+        <section className="onboarding-content">
+          {error ? <Notice message={error} onDismiss={props.onDismissError} /> : null}
+          {workspace.step === 0 ? (
+            <div className="onboarding-stage onboarding-stage--narrow">
+              <StageHeader step="01 / 03" eyebrow="PRODUCT" title="What are we casting for?" description="Paste the public product page. Hypecast will extract an editable creative brief before it spends anything on creator images." />
+              <form className="onboarding-url-form" onSubmit={props.onAnalyze}>
+                <label htmlFor="studio-product-url">Public product URL</label>
+                <input id="studio-product-url" type="url" value={workspace.productUrl} placeholder="https://yourproduct.com" onChange={(event) => props.onUpdateWorkspace({ productUrl: event.target.value })} required />
+                <button className="button button--primary button--wide" disabled={busy === "analyzing"}>{busy === "analyzing" ? <LoaderCircle className="spin" size={17} /> : <WandSparkles size={17} />} Build the creative direction</button>
+              </form>
+              <button className="text-button onboarding-demo" onClick={props.onStartDemo}><Play size={15} /> Continue with the sample product instead</button>
+            </div>
+          ) : null}
+
+          {workspace.step === 1 && workspace.brief ? (
+            <div className="onboarding-stage">
+              <StageHeader step="02 / 03" eyebrow="DIRECTION" title="Make sure the premise is true." description="This is the source material for the cast and every future story. Fix anything vague, generic, or unsupported." />
+              <div className="brief-source"><span>{workspace.brief.source.title || workspace.brief.source.url}</span><a href={workspace.brief.source.url} target="_blank" rel="noreferrer">View source</a></div>
+              <div className="form-grid onboarding-form-grid">
+                <label><span>Product name</span><input value={workspace.brief.productName} onChange={(event) => props.onUpdateBrief("productName", event.target.value)} /></label>
+                <label><span>Writing voice</span><input value={workspace.brief.tone} onChange={(event) => props.onUpdateBrief("tone", event.target.value)} /></label>
+                <label className="span-2"><span>What it does</span><textarea rows={3} value={workspace.brief.oneLiner} onChange={(event) => props.onUpdateBrief("oneLiner", event.target.value)} /></label>
+                <label className="span-2"><span>Who the stories are for</span><textarea rows={3} value={workspace.brief.audience} onChange={(event) => props.onUpdateBrief("audience", event.target.value)} /></label>
+                <label className="span-2"><span>The tension worth writing about</span><textarea rows={3} value={workspace.brief.problem} onChange={(event) => props.onUpdateBrief("problem", event.target.value)} /></label>
+              </div>
+              <div className="onboarding-action"><button className="button button--primary" onClick={props.onCreateCast} disabled={busy === "cast"}>{busy === "cast" ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} Approve and cast five creators</button><span>Live mode uses five image generations.</span></div>
+            </div>
+          ) : null}
+
+          {workspace.step === 2 ? (
+            <div className="onboarding-stage onboarding-stage--wide">
+              <StageHeader step="03 / 03" eyebrow="CAST" title="Who should tell these stories?" description="Choose the person who feels native to the audience—not the most polished face. Their appearance and character bible anchor future assets." />
+              <div className="onboarding-cast-grid">
+                {workspace.creators.map((creator) => (
+                  <button key={creator.id} className={`onboarding-cast-card ${workspace.selectedCreatorId === creator.id ? "is-selected" : ""}`} onClick={() => creator.imageStatus === "ready" && props.onChooseCreator(creator.id)} disabled={creator.imageStatus !== "ready"}>
+                    <div className="creator-image">{creator.imageDataUrl ? <img src={creator.imageDataUrl} alt={creator.name} /> : <div className="loading-tile"><LoaderCircle className={creator.imageStatus === "generating" ? "spin" : ""} /><span>{creator.imageStatus === "failed" ? "Image failed" : "Casting…"}</span></div>}{workspace.selectedCreatorId === creator.id ? <span className="selected-stamp"><Check size={14} /> YOUR CAST</span> : null}</div>
+                    <div><span>{creator.archetype}</span><h3>{creator.name}</h3><p>{creator.energy} · {creator.wardrobe}</p></div>
+                  </button>
+                ))}
+              </div>
+              <div className="onboarding-action"><button className="button button--primary" onClick={props.onOpenStudio} disabled={!selectedCreator}><ArrowRight size={17} /> Open {selectedCreator?.name.split(" ")[0] || "cast"}&apos;s studio</button><span>The chosen portrait is reused. No new image or video call.</span></div>
+            </div>
+          ) : null}
+        </section>
+      </main>
+    </div>
+  );
+}
+
+type CastStudioProps = {
+  workspace: WorkspaceSnapshot;
+  creator: CreatorCandidate;
+  clerkEnabled: boolean;
+  selectedReel?: Reel;
+  selectedAssetId: string;
+  activeClip?: VideoClip;
+  previewReel?: Reel;
+  busy: string;
+  error: string;
+  exportProgress: Record<string, number>;
+  capabilities: (AppCapabilities & { openrouter?: boolean }) | null;
+  onDismissError: () => void;
+  onReset: () => void;
+  onSelectReel: (id: string) => void;
+  onSelectAsset: (id: string) => void;
+  onUpdateStory: (reel: Reel, text: string) => void;
+  onUpdateReel: (id: string, patch: Partial<Reel>) => void;
+  onBuildReels: () => void;
+  onExport: (reel: Reel) => void;
+};
+
+function CastStudio(props: CastStudioProps) {
+  const { workspace, creator, selectedReel } = props;
+  const story = selectedReel?.cards[0]?.text || "";
+  const wordCount = story.trim() ? story.trim().split(/\s+/).length : 0;
+  const exporting = selectedReel ? Boolean(props.exportProgress[selectedReel.id] && props.exportProgress[selectedReel.id] < 100) : false;
+
+  return (
+    <div className="cast-shell">
+      <aside className="cast-sidebar">
+        <button className="brand" onClick={props.onReset}><span className="brand-mark">H</span><span>HYPECAST</span></button>
+        <span className="cast-nav-label">WORKSPACE</span>
+        <nav className="cast-nav"><a className="is-active" href="#cast-studio"><LayoutGrid size={16} /><span>Cast studio</span></a><a href="#cast-backgrounds"><Library size={16} /><span>Backgrounds</span><small>{workspace.clips.length}</small></a><a href="#cast-reels"><FileVideo size={16} /><span>Reels</span><small>{workspace.reels.length}</small></a></nav>
+        <div className="cast-sidebar-project"><span>ACTIVE PROJECT</span><strong>{workspace.brief?.productName}</strong><button onClick={props.onReset}>Start another product</button></div>
+        <div className="cast-sidebar-user">{props.clerkEnabled ? <Show when="signed-in"><UserButton /></Show> : null}<span>{props.clerkEnabled ? "Saved to your studio" : "Local demo project"}</span></div>
+      </aside>
+
+      <main className="cast-main">
+        <header className="cast-topbar"><div><span>CAST STUDIO / {creator.name.toUpperCase()}</span><h1>Make the next reel.</h1></div><div className="cast-topbar-status"><span className="signal signal--live" /> Autosaved</div></header>
+        {props.error ? <Notice message={props.error} onDismiss={props.onDismissError} /> : null}
+        <div className="cast-workbench" id="cast-studio">
+          <section className="cast-assets-panel" id="cast-backgrounds">
+            <div className="cast-profile"><img src={creator.imageDataUrl} alt={creator.name} /><div><span>YOUR CAST</span><h2>{creator.name}</h2><p>{creator.archetype}</p></div></div>
+            <div className="cast-character-note"><span>CONTINUITY</span><p>{creator.characterBible}</p></div>
+            <div className="asset-heading"><div><span>BACKGROUND LIBRARY</span><strong>Choose one image or video</strong></div><button title="Video generation is planned for run two" disabled><Plus size={15} /></button></div>
+            <div className="asset-list">
+              {workspace.clips.map((clip) => <button key={clip.id} className={props.selectedAssetId === clip.id || selectedReel?.clipId === clip.id ? "is-selected" : ""} onClick={() => props.onSelectAsset(clip.id)}><div>{clip.videoUrl ? <video src={clip.videoUrl} muted playsInline /> : <img src={clip.posterUrl} alt="" />}{clip.videoUrl ? <FileVideo size={13} /> : <ImageIcon size={13} />}</div><span>{clip.label}</span><small>{clip.provider === "still" ? "$0 · subtle push-in" : `${clip.provider} · reusable`}</small></button>)}
+            </div>
+            <div className="motion-note"><Plus size={14} /><div><strong>Add motion in run two</strong><span>Generate once, then reuse it across many stories.</span></div></div>
+          </section>
+
+          <section className="cast-preview-stage">
+            <div className="cast-preview-head"><span>LIVE OUTPUT</span><strong>9:16 · 15 sec · sound off</strong></div>
+            <ReelPreview reel={props.previewReel} clip={props.activeClip} />
+            {workspace.reels.length ? <div className="studio-reel-tabs">{workspace.reels.map((reel, index) => <button key={reel.id} className={selectedReel?.id === reel.id ? "is-active" : ""} onClick={() => props.onSelectReel(reel.id)}><span>0{index + 1}</span><strong>{reel.title}</strong></button>)}</div> : <div className="preview-empty-note">Your selected cast asset is ready. Write the first batch to fill the canvas.</div>}
+          </section>
+
+          <section className="story-panel" id="cast-reels">
+            <div className="story-panel-head"><div><span>STORY DESK</span><h2>{selectedReel ? selectedReel.title : "Write the first batch"}</h2></div><span className="draft-pill">{workspace.mode === "demo" ? "DEMO" : "AI DRAFT"}</span></div>
+            {selectedReel ? (
+              <>
+                <div className="story-rule"><span>ONE TEXT · FULL DURATION</span><strong>00:00 — 00:15</strong></div>
+                <label className="story-editor"><span>Story</span><textarea value={story} rows={17} onChange={(event) => props.onUpdateStory(selectedReel, event.target.value)} /><small>{wordCount} words · aim for 80–145 · product facts should be checked before posting</small></label>
+                <div className="story-controls">
+                  <label><span>Placement</span><select value={selectedReel.position} onChange={(event) => props.onUpdateReel(selectedReel.id, { position: event.target.value as Reel["position"] })}><option value="top">Top safe zone</option><option value="center">Center</option><option value="bottom">Bottom safe zone</option></select></label>
+                  <label><span>Treatment</span><select value={selectedReel.style} onChange={(event) => props.onUpdateReel(selectedReel.id, { style: event.target.value as Reel["style"] })}><option value="glass">Smoked glass</option><option value="clean">Clean outline</option><option value="highlight">Hype orange</option></select></label>
+                </div>
+                <div className="story-actions"><button className="button" onClick={props.onBuildReels} disabled={props.busy === "stories"}>{props.busy === "stories" ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />} Rewrite batch</button><button className="button button--primary" onClick={() => props.onExport(selectedReel)} disabled={exporting}>{exporting ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}{exporting ? `Encoding ${props.exportProgress[selectedReel.id]}%` : "Export MP4"}</button></div>
+              </>
+            ) : (
+              <div className="story-empty">
+                <div className="story-structure"><span>01</span><p>Specific incident</p><span>02</span><p>Escalation</p><span>03</span><p>Natural product role</p><span>04</span><p>Sharp final reversal</p></div>
+                <p>Hypecast will write five product-native mini-stories—not five variations of an ad headline.</p>
+                <button className="button button--primary button--wide" onClick={props.onBuildReels} disabled={props.busy === "stories"}>{props.busy === "stories" ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} Write five stories</button>
+              </div>
+            )}
+            <div className="studio-health"><span><i className={props.capabilities?.openai ? "is-ready" : ""} /> Writing model</span><span><i className="is-ready" /> $0 still mode</span><span><i className={props.capabilities?.convex ? "is-ready" : ""} /> Cloud save</span></div>
+          </section>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function Notice({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return <div className="notice notice--error"><CircleAlert size={17} /><span>{message}</span><button onClick={onDismiss}><X size={15} /></button></div>;
+}
+
+function StageHeader({ step, eyebrow, title, description }: { step: string; eyebrow: string; title: string; description: string }) {
+  return <header className="onboarding-stage-header"><span className="stage-count">{step}</span><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></header>;
 }

@@ -37,8 +37,8 @@ export const hooksSchema = z.object({
   hooks: z.array(
     z.object({
       title: z.string(),
-      hook: z.string(),
-      followUp: z.string(),
+      angle: z.string(),
+      story: z.string().min(220).max(1_200),
     }),
   ).length(5),
 });

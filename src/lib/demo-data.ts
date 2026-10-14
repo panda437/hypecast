@@ -92,14 +92,14 @@ export const demoCreators: CreatorCandidate[] = creatorSeed.map((entry, index) =
 export function demoReferences(creator: CreatorCandidate): ReferenceImage[] {
   const index = demoCreators.findIndex((item) => item.id === creator.id);
   return [
-    { id: "ref-anchor", label: "First-run portrait", direction: "The selected creator image becomes the reusable 17-second still background", imageDataUrl: portrait(creator.name, index, 0), status: "ready" },
+    { id: "ref-anchor", label: "First-run portrait", direction: "The selected creator image becomes the reusable 15-second still background", imageDataUrl: portrait(creator.name, index, 0), status: "ready" },
   ];
 }
 
 export function demoClips(references: ReferenceImage[]): VideoClip[] {
   return [{
     id: "clip-still",
-    label: "Creator portrait · 17s",
+    label: "Creator portrait · 15s",
     motionPrompt: "A gentle local push-in gives the still subtle motion without a video-generation call",
     referenceImageId: references[0].id,
     provider: "still",
@@ -108,14 +108,22 @@ export function demoClips(references: ReferenceImage[]): VideoClip[] {
   }];
 }
 
+const demoStories = [
+  "our product team had twelve customer calls in one week and somehow came out with thirteen different priorities. everyone remembered the loudest quote, nobody could find the actual notes, and the roadmap meeting turned into a very expensive memory contest. then the quiet pm dropped every call into Mosaic and grouped the evidence by theme. suddenly the feature everyone was arguing for had one mention, while the boring onboarding problem had nine. the roadmap did not need more opinions. it needed receipts.",
+  "we hired a consultant to tell us why customers kept churning. three workshops, two giant decks, and one truly heroic amount of sticky notes later, the answer was apparently ‘improve activation.’ meanwhile an intern had put the last fifty cancellation calls into Mosaic and found the same sentence hiding in half of them. customers were not confused by activation. they could not find one setting after the trial ended. we spent a month looking for strategy when the answer was sitting in the transcript search.",
+  "our founder said we were a customer-obsessed company, which mostly meant somebody pasted random screenshots into slack at midnight. every screenshot became urgent, every loud customer became the roadmap, and by friday nobody could remember why we were building anything. the new pm moved the feedback into Mosaic and attached the original evidence to every decision. now when someone says ‘users keep asking for this,’ there is a slightly terrifying follow-up: which users? customer obsession got a lot quieter once it needed sources.",
+  "the team shipped the feature sales had been requesting for six months. launch post ready, confetti emoji deployed, absolutely nobody used it. turns out the request had come from one prospect who never became a customer, but the story had been repeated so many times it started sounding like research. the next roadmap went through Mosaic, where every idea stayed attached to the call, account, and exact quote behind it. institutional memory is useful. institutional fan fiction is expensive.",
+  "we had feedback in notion, slack, hubspot, three spreadsheets, and one document named FINAL-final-2. leadership called this ‘having a lot of customer context.’ the product team called it tuesday. after they pulled it into Mosaic, the same complaints started showing up across interviews that nobody had connected before. one week later the roadmap got smaller, clearer, and much harder to derail with a single dramatic message. the insight was never missing. it was just losing a game of hide and seek across six tabs.",
+];
+
 export function demoReels(clips: VideoClip[]): Reel[] {
-  return demoBrief.hookAngles.map((hook, index) => ({
+  return demoStories.map((story, index) => ({
     id: `reel-${index + 1}`,
-    title: `Reel ${String(index + 1).padStart(2, "0")}`,
+    title: ["The memory contest", "Three workshops later", "Customer obsessed", "Institutional fan fiction", "Six-tab hide and seek"][index],
     clipId: clips[index % clips.length].id,
-    hook,
-    cards: [{ id: `card-${index + 1}`, text: hook, start: 0, end: 17 }],
-    position: index % 3 === 0 ? "top" : index % 3 === 1 ? "center" : "bottom",
-    style: index % 3 === 0 ? "glass" : index % 3 === 1 ? "clean" : "highlight",
+    hook: story.split(".")[0],
+    cards: [{ id: `card-${index + 1}`, text: story, start: 0, end: 15 }],
+    position: "center",
+    style: "glass",
   }));
 }

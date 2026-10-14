@@ -16,7 +16,7 @@ export function ReelPreview({ reel, clip, compact = false }: ReelPreviewProps) {
   useEffect(() => {
     if (clip?.videoUrl) return;
     const started = performance.now();
-    const timer = window.setInterval(() => setTime(((performance.now() - started) / 1000) % 17), 120);
+    const timer = window.setInterval(() => setTime(((performance.now() - started) / 1000) % 15), 120);
     return () => window.clearInterval(timer);
   }, [clip?.videoUrl]);
 
@@ -53,12 +53,12 @@ export function ReelPreview({ reel, clip, compact = false }: ReelPreviewProps) {
       </div>
       <div className="safe-zone" aria-hidden="true" />
       {activeCard ? (
-        <div className={`reel-copy reel-copy--${reel?.position || "center"} reel-copy--${reel?.style || "glass"}`}>
+        <div className={`reel-copy reel-copy--${reel?.position || "center"} reel-copy--${reel?.style || "glass"} ${activeCard.text.length > 420 ? "reel-copy--long" : activeCard.text.length > 220 ? "reel-copy--medium" : ""}`}>
           {activeCard.text}
         </div>
       ) : null}
       <div className="reel-brand">HYPECAST / SILENT CUT</div>
-      <div className="reel-time">{Math.floor(time).toString().padStart(2, "0")}:17</div>
+      <div className="reel-time">{Math.floor(time).toString().padStart(2, "0")}:15</div>
     </div>
   );
 }
