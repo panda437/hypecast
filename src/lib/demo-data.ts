@@ -129,6 +129,6 @@ export function demoReels(clips: VideoClip[], brief?: ProductBrief): Reel[] {
     position: "center",
     style: "glass",
     fontFamily: "sans",
-    fontSize: "medium",
+    fontSize: "small",
   }));
 }

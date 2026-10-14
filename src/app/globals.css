@@ -207,12 +207,12 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 .reel-empty span { color: var(--accent); font: 700 24px/1 var(--font-mono); }
 .reel-empty p { width: 150px; font-size: 10px; line-height: 1.4; }
 .safe-zone { position: absolute; inset: 8% 7% 12%; border: 1px dashed rgba(255,255,255,.13); border-radius: 8px; pointer-events: none; }
-.reel-copy { position: absolute; z-index: 2; left: 8%; right: 8%; text-align: center; font-size: clamp(18px, 2.1vw, 26px); line-height: 1.03; letter-spacing: -.045em; font-weight: 820; text-wrap: balance; }
+.reel-copy { position: absolute; z-index: 2; left: 8%; right: 8%; text-align: center; font-size: clamp(16px, 1.8vw, 22px); line-height: 1.03; letter-spacing: -.045em; font-weight: 820; text-wrap: balance; }
 .reel-copy--top { top: 18%; }
-.reel-copy--center { top: 48%; transform: translateY(-50%); }
+.reel-copy--center { top: 62%; transform: translateY(-50%); }
 .reel-copy--bottom { bottom: 20%; }
-.reel-copy--size-small { font-size: clamp(15px, 1.72vw, 21px); }
-.reel-copy--size-large { font-size: clamp(21px, 2.48vw, 31px); }
+.reel-copy--size-small { font-size: clamp(13px, 1.45vw, 18px); }
+.reel-copy--size-large { font-size: clamp(19px, 2.15vw, 27px); }
 .reel-copy--font-sans { font-family: var(--font-sans); }
 .reel-copy--font-serif { font-family: Georgia, "Times New Roman", serif; letter-spacing: -.032em; font-weight: 700; }
 .reel-copy--font-mono { font-family: var(--font-mono); letter-spacing: -.035em; font-weight: 700; }
@@ -578,12 +578,12 @@ input:focus, textarea:focus, select:focus { border-color: rgba(255,101,66,.62); 
 
 /* Long static-story treatment */
 .reel-copy { white-space: pre-wrap; }
-.reel-copy--copy-medium { text-align: left; font-size: clamp(12px, 1.25vw, 15px); line-height: 1.2; letter-spacing: -.018em; font-weight: 680; text-wrap: pretty; }
-.reel-copy--copy-medium.reel-copy--size-small { font-size: clamp(10px, 1.03vw, 12px); }
-.reel-copy--copy-medium.reel-copy--size-large { font-size: clamp(14px, 1.48vw, 18px); }
-.reel-copy--copy-long { text-align: left; font-size: clamp(9px, 1vw, 12px); line-height: 1.25; letter-spacing: -.012em; font-weight: 650; text-wrap: pretty; }
-.reel-copy--copy-long.reel-copy--size-small { font-size: clamp(8px, .82vw, 10px); }
-.reel-copy--copy-long.reel-copy--size-large { font-size: clamp(11px, 1.18vw, 14px); }
+.reel-copy--copy-medium { text-align: left; font-size: clamp(11px, 1.08vw, 13px); line-height: 1.2; letter-spacing: -.018em; font-weight: 680; text-wrap: pretty; }
+.reel-copy--copy-medium.reel-copy--size-small { font-size: clamp(9px, .9vw, 11px); }
+.reel-copy--copy-medium.reel-copy--size-large { font-size: clamp(13px, 1.3vw, 16px); }
+.reel-copy--copy-long { text-align: left; font-size: clamp(8px, .86vw, 10px); line-height: 1.25; letter-spacing: -.012em; font-weight: 650; text-wrap: pretty; }
+.reel-copy--copy-long.reel-copy--size-small { font-size: clamp(7px, .72vw, 9px); }
+.reel-copy--copy-long.reel-copy--size-large { font-size: clamp(10px, 1vw, 12px); }
 
 @media (max-width: 1260px) {
   .home-hero { grid-template-columns: .9fr 1.1fr; gap: 40px; }

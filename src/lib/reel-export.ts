@@ -40,7 +40,7 @@ function drawOverlay(ctx: CanvasRenderingContext2D, reel: Reel, time: number) {
       ? "'Geist Mono', 'Courier New', monospace"
       : "Geist, Arial, Helvetica, sans-serif";
   const fontWeight = reel.fontFamily === "mono" ? 700 : isStory ? 650 : reel.fontFamily === "serif" ? 700 : 800;
-  let fontSize = Math.round((isStory ? 34 : card.text.length > 92 ? 48 : card.text.length > 58 ? 56 : 66) * sizeScale);
+  let fontSize = Math.round((isStory ? 30 : card.text.length > 92 ? 42 : card.text.length > 58 ? 49 : 58) * sizeScale);
   let lines: string[] = [];
   const maxWidth = WIDTH - 132;
   const maxHeight = 880;
@@ -54,7 +54,7 @@ function drawOverlay(ctx: CanvasRenderingContext2D, reel: Reel, time: number) {
   ctx.textBaseline = "middle";
   const lineHeight = fontSize * (isStory ? 1.24 : 1.1);
   const blockHeight = Math.min(maxHeight + 54, lines.length * lineHeight + 58);
-  const centerY = reel.position === "top" ? 310 : reel.position === "bottom" ? 900 : 625;
+  const centerY = reel.position === "top" ? 310 : reel.position === "bottom" ? 900 : 805;
   const top = Math.max(122, Math.min(HEIGHT - 142 - blockHeight, centerY - blockHeight / 2));
 
   if (reel.style === "glass") {

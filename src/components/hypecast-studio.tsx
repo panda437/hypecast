@@ -83,7 +83,11 @@ const emptyWorkspace: WorkspaceSnapshot = {
 
 const homepageReferences = demoReferences(demoCreators[0]);
 const homepageClips = demoClips(homepageReferences);
-const homepageReel = demoReels(homepageClips)[0];
+const homepageReel: Reel = {
+  ...demoReels(homepageClips)[0],
+  style: "clean",
+  fontSize: "small",
+};
 
 function pause(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -127,7 +131,7 @@ function reelsFromHooks(
     position: "center" as const,
     style: "glass" as const,
     fontFamily: "sans" as const,
-    fontSize: "medium" as const,
+    fontSize: "small" as const,
   }));
 }
 
@@ -890,7 +894,7 @@ export function CueFaceStudio() {
     position: "center",
     style: "glass",
     fontFamily: "sans",
-    fontSize: "medium",
+    fontSize: "small",
   } satisfies Reel) : undefined);
 
   const experience = workspace.step === 3 && selectedCreator ? (
@@ -1301,8 +1305,8 @@ function CastStudio(props: CastStudioProps) {
                 <div className="story-controls">
                   <label><span>Font</span><select aria-label="Reel font" value={selectedReel.fontFamily} onChange={(event) => props.onUpdateReel(selectedReel.id, { fontFamily: event.target.value as Reel["fontFamily"] })}><option value="sans">Clean sans</option><option value="serif">Editorial serif</option><option value="mono">Typewriter mono</option></select></label>
                   <label><span>Text size</span><select aria-label="Reel text size" value={selectedReel.fontSize} onChange={(event) => props.onUpdateReel(selectedReel.id, { fontSize: event.target.value as Reel["fontSize"] })}><option value="small">Compact</option><option value="medium">Standard</option><option value="large">Large</option></select></label>
-                  <label><span>Placement</span><select value={selectedReel.position} onChange={(event) => props.onUpdateReel(selectedReel.id, { position: event.target.value as Reel["position"] })}><option value="top">Top safe zone</option><option value="center">Center</option><option value="bottom">Bottom safe zone</option></select></label>
-                  <label><span>Treatment</span><select value={selectedReel.style} onChange={(event) => props.onUpdateReel(selectedReel.id, { style: event.target.value as Reel["style"] })}><option value="glass">Smoked glass</option><option value="clean">Clean outline</option><option value="highlight">Cue coral</option></select></label>
+                  <label><span>Placement</span><select value={selectedReel.position} onChange={(event) => props.onUpdateReel(selectedReel.id, { position: event.target.value as Reel["position"] })}><option value="top">Top safe zone</option><option value="center">Below face · default</option><option value="bottom">Bottom safe zone</option></select></label>
+                  <label><span>Treatment</span><select value={selectedReel.style} onChange={(event) => props.onUpdateReel(selectedReel.id, { style: event.target.value as Reel["style"] })}><option value="glass">Smoked glass</option><option value="clean">Transparent shadow</option><option value="highlight">Cue coral</option></select></label>
                 </div>
                 <div className="story-actions"><button className="button" onClick={props.onBuildReels} disabled={props.busy === "stories"}>{props.busy === "stories" ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />} Rewrite batch</button><button className="button button--primary" onClick={() => props.onExport(selectedReel)} disabled={exporting}>{exporting ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}{exporting ? `Encoding ${props.exportProgress[selectedReel.id]}%` : "Export MP4"}</button></div>
                 <button className="button button--wide bulk-export-button" onClick={props.onExportAll} disabled={Boolean(props.bulkExportProgress) || workspace.reels.length !== 5}>{props.bulkExportProgress ? <LoaderCircle className="spin" size={15} /> : <FileArchive size={15} />}{props.bulkExportProgress ? `Exporting ${props.bulkExportProgress.current} of ${props.bulkExportProgress.total} · ${props.bulkExportProgress.percent}%` : "Export all 5 as ZIP"}</button>
