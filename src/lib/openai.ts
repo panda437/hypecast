@@ -2,6 +2,7 @@ import OpenAI, { toFile } from "openai";
 import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
 import { assertPublicUrl } from "@/lib/url-safety";
+import { configuredImageInputFidelity } from "./openai-image-options";
 
 let client: OpenAI | undefined;
 
@@ -72,6 +73,7 @@ export async function editPortrait(sourceDataUrl: string, prompt: string) {
   }
   const extension = contentType.split("/")[1].replace("jpeg", "jpg");
   const file = await toFile(bytes, `creator.${extension}`, { type: contentType });
+  const inputFidelity = configuredImageInputFidelity();
   const response = await getOpenAI().images.edit({
     model: imageModel,
     image: file,
@@ -79,7 +81,7 @@ export async function editPortrait(sourceDataUrl: string, prompt: string) {
     n: 1,
     size: "768x1360",
     quality: "medium",
-    input_fidelity: "high",
+    ...(inputFidelity ? { input_fidelity: inputFidelity } : {}),
     background: "opaque",
     output_format: "webp",
     output_compression: 78,
