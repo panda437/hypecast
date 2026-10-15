@@ -1,9 +1,14 @@
 import { resolve4, resolve6 } from "node:dns/promises";
 import { isIP } from "node:net";
 import * as cheerio from "cheerio";
+import { HttpError } from "./server-auth";
 
 const MAX_BYTES = 3_000_000;
 const MAX_REDIRECTS = 3;
+
+function pageInputError(message: string, action = "Check that the link is public, complete, and opens without a login, then try again.") {
+  return new HttpError(message, 400, action, "PAGE_READ_FAILED");
+}
 
 function isBlockedIpv4(address: string) {
   const [a, b] = address.split(".").map(Number);
@@ -39,29 +44,29 @@ export async function assertPublicUrl(value: string) {
   try {
     url = new URL(value);
   } catch {
-    throw new Error("Enter a complete public URL, including https://");
+    throw pageInputError("Enter a complete public URL, including https://");
   }
-  if (!["http:", "https:"].includes(url.protocol)) throw new Error("Only HTTP and HTTPS URLs are allowed.");
-  if (url.username || url.password) throw new Error("URLs with embedded credentials are not allowed.");
-  if (url.port && !["80", "443"].includes(url.port)) throw new Error("Only standard web ports are allowed.");
+  if (!["http:", "https:"].includes(url.protocol)) throw pageInputError("Only HTTP and HTTPS URLs are allowed.");
+  if (url.username || url.password) throw pageInputError("URLs with embedded credentials are not allowed.");
+  if (url.port && !["80", "443"].includes(url.port)) throw pageInputError("Only standard web ports are allowed.");
   const hostname = url.hostname.toLowerCase();
   const addressHost = hostname.replace(/^\[/, "").replace(/\]$/, "");
   if (hostname === "localhost" || hostname.endsWith(".local") || hostname.endsWith(".internal")) {
-    throw new Error("Local and private hostnames are not allowed.");
+    throw pageInputError("Local and private hostnames are not allowed.");
   }
 
   const literalType = isIP(addressHost);
-  if (literalType === 4 && isBlockedIpv4(addressHost)) throw new Error("Private network addresses are not allowed.");
-  if (literalType === 6 && isBlockedIpv6(addressHost)) throw new Error("Private network addresses are not allowed.");
+  if (literalType === 4 && isBlockedIpv4(addressHost)) throw pageInputError("Private network addresses are not allowed.");
+  if (literalType === 6 && isBlockedIpv6(addressHost)) throw pageInputError("Private network addresses are not allowed.");
 
   if (!literalType) {
     const [v4, v6] = await Promise.all([
       resolve4(hostname).catch(() => []),
       resolve6(hostname).catch(() => []),
     ]);
-    if (v4.length + v6.length === 0) throw new Error("That hostname could not be resolved.");
+    if (v4.length + v6.length === 0) throw pageInputError("That hostname could not be resolved.");
     if (v4.some(isBlockedIpv4) || v6.some(isBlockedIpv6)) {
-      throw new Error("That hostname resolves to a private network.");
+      throw pageInputError("That hostname resolves to a private network.");
     }
   }
   return url;
@@ -69,7 +74,7 @@ export async function assertPublicUrl(value: string) {
 
 async function readLimitedBody(response: Response) {
   const declaredLength = Number(response.headers.get("content-length") || 0);
-  if (declaredLength > MAX_BYTES) throw new Error("The page is too large to analyze safely.");
+  if (declaredLength > MAX_BYTES) throw pageInputError("The page is too large to analyze safely.", "Use a shorter public landing page or app-store link instead.");
   if (!response.body) return "";
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -81,7 +86,7 @@ async function readLimitedBody(response: Response) {
     total += value.byteLength;
     if (total > MAX_BYTES) {
       await reader.cancel();
-      throw new Error("The page is too large to analyze safely.");
+      throw pageInputError("The page is too large to analyze safely.", "Use a shorter public landing page or app-store link instead.");
     }
     html += decoder.decode(value, { stream: true });
   }
@@ -99,13 +104,13 @@ export async function extractPublicPage(input: string) {
     });
     if (![301, 302, 303, 307, 308].includes(response.status)) break;
     const location = response.headers.get("location");
-    if (!location) throw new Error("The site returned an invalid redirect.");
+    if (!location) throw pageInputError("The site returned an invalid redirect.");
     url = await assertPublicUrl(new URL(location, url).toString());
-    if (redirect === MAX_REDIRECTS) throw new Error("The site redirected too many times.");
+    if (redirect === MAX_REDIRECTS) throw pageInputError("The site redirected too many times.");
   }
-  if (!response?.ok) throw new Error(`The page returned HTTP ${response?.status || "error"}.`);
+  if (!response?.ok) throw pageInputError("CueFace could not read that page.", "Open the link in a private window to confirm it is public, then retry or use another product page.");
   const contentType = response.headers.get("content-type") || "";
-  if (!contentType.includes("text/html")) throw new Error("The URL must point to a public HTML page.");
+  if (!contentType.includes("text/html")) throw pageInputError("The URL must point to a public webpage.", "Use the product landing page or app-store listing instead of a file or API link.");
 
   const html = await readLimitedBody(response);
   const $ = cheerio.load(html);
@@ -122,6 +127,6 @@ export async function extractPublicPage(input: string) {
     .filter(Boolean)
     .slice(0, 16);
   const body = $("body").text().replace(/\s+/g, " ").trim().slice(0, 12_000);
-  if (!title && body.length < 80) throw new Error("There was not enough public page content to analyze.");
+  if (!title && body.length < 80) throw pageInputError("There was not enough public page content to analyze.", "Use a product page with visible text, or try the app-store listing.");
   return { url: url.toString(), title, description, headings, body };
 }

@@ -1,3 +1,5 @@
+import { HttpError } from "./server-auth";
+
 export type SubmitVideoInput = {
   prompt: string;
   startImageUrl: string;
@@ -38,6 +40,10 @@ export type VideoModelOption = {
 
 const DEFAULT_MAX_PER_SECOND_USD = 0.03;
 
+function providerError(message: string, status: number) {
+  return Object.assign(new Error(message), { status });
+}
+
 export function openRouterVideoPriceCap() {
   const configured = Number(process.env.OPENROUTER_VIDEO_MAX_PER_SECOND_USD || DEFAULT_MAX_PER_SECOND_USD);
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_PER_SECOND_USD;
@@ -58,7 +64,7 @@ function estimate480p(model: OpenRouterModel) {
 
 export async function listOpenRouterVideoOptions(): Promise<VideoModelOption[]> {
   const response = await fetch("https://openrouter.ai/api/v1/videos/models", { next: { revalidate: 600 } });
-  if (!response.ok) throw new Error("OpenRouter's video catalog is unavailable.");
+  if (!response.ok) throw providerError("OpenRouter's video catalog is unavailable.", response.status);
   const payload = (await response.json()) as { data?: OpenRouterModel[] };
   return (payload.data || [])
     .filter(
@@ -92,7 +98,7 @@ export async function selectOpenRouterVideoOption() {
   const configured = process.env.OPENROUTER_VIDEO_MODEL;
   const selected = affordable.find((option) => option.id === configured) || affordable[0];
   if (!selected) {
-    throw new Error("No compatible video model is available right now.");
+    throw new HttpError("No compatible 15-second video model is available right now.", 503, "Keep using still-image reels and try AI video again later.", "NO_VIDEO_MODEL");
   }
   return selected;
 }
@@ -103,7 +109,7 @@ class OpenRouterVideoProvider implements VideoProvider {
   }
 
   private get headers() {
-    if (!process.env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is not configured.");
+    if (!process.env.OPENROUTER_API_KEY) throw new HttpError("AI video generation is not connected.", 503, "Keep using still-image reels or contact support.", "VIDEO_PROVIDER_NOT_CONFIGURED");
     return {
       Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
@@ -135,7 +141,7 @@ class OpenRouterVideoProvider implements VideoProvider {
     });
     const payload = await response.json();
     if (!response.ok || !payload.id) {
-      throw new Error(payload.error?.message || payload.error || "OpenRouter rejected the video job.");
+      throw providerError(payload.error?.message || payload.error || "OpenRouter rejected the video job.", response.status);
     }
     return { requestId: payload.id, status: "queued" };
   }
@@ -146,7 +152,7 @@ class OpenRouterVideoProvider implements VideoProvider {
       { headers: this.headers, cache: "no-store" },
     );
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error?.message || payload.error || "Could not read the video job.");
+    if (!response.ok) throw providerError(payload.error?.message || payload.error || "Could not read the video job.", response.status);
     if (["pending", "queued"].includes(payload.status)) return { requestId, status: "queued" };
     if (["processing", "in_progress", "running"].includes(payload.status)) {
       return { requestId, status: "generating" };
@@ -166,7 +172,7 @@ class FalVideoProvider implements VideoProvider {
   private endpoint = "fal-ai/kling-video/v3/pro/image-to-video";
 
   private get headers() {
-    if (!process.env.FAL_KEY) throw new Error("FAL_KEY is not configured.");
+    if (!process.env.FAL_KEY) throw new HttpError("AI video generation is not connected.", 503, "Keep using still-image reels or contact support.", "VIDEO_PROVIDER_NOT_CONFIGURED");
     return { Authorization: `Key ${process.env.FAL_KEY}`, "Content-Type": "application/json" };
   }
 
@@ -189,7 +195,7 @@ class FalVideoProvider implements VideoProvider {
     });
     const payload = await response.json();
     if (!response.ok || !payload.request_id) {
-      throw new Error(payload.detail || payload.error || "fal.ai rejected the video job.");
+      throw providerError(payload.detail || payload.error || "fal.ai rejected the video job.", response.status);
     }
     return { requestId: payload.request_id, status: "queued" };
   }
@@ -200,7 +206,7 @@ class FalVideoProvider implements VideoProvider {
       { headers: this.headers, cache: "no-store" },
     );
     const statusPayload = await statusResponse.json();
-    if (!statusResponse.ok) throw new Error(statusPayload.detail || "Could not read the video job.");
+    if (!statusResponse.ok) throw providerError(statusPayload.detail || "Could not read the video job.", statusResponse.status);
     if (statusPayload.status === "IN_QUEUE") return { requestId, status: "queued" };
     if (statusPayload.status === "IN_PROGRESS") return { requestId, status: "generating" };
     if (statusPayload.status === "COMPLETED") {

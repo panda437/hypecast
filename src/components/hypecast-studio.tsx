@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Check,
   CircleAlert,
+  CircleHelp,
   Clock3,
   Cloud,
   Copy,
@@ -16,15 +17,17 @@ import {
   LayoutGrid,
   Library,
   LoaderCircle,
+  LockKeyhole,
   LogIn,
   Pencil,
   Play,
   Plus,
+  Send,
   Sparkles,
   WandSparkles,
   X,
 } from "lucide-react";
-import { Show, SignInButton, UserButton } from "@clerk/nextjs";
+import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { demoClips, demoCreators, demoCreatorsForBrief, demoReels, demoReferences } from "@/lib/demo-data";
@@ -328,6 +331,9 @@ export function CueFaceStudio() {
         const result = await apiRequest<VideoClip & { credits?: VideoCredits }>("/api/video/status", { requestId: clip.requestId });
         if (cancelled) return;
         if (result.credits) setVideoCredits(result.credits);
+        if (result.status === "failed") {
+          setError(result.error || "The AI video could not be generated. Your video credit was returned; try a different motion direction.");
+        }
         setWorkspace((current) => ({
           ...current,
           clips: current.clips.map((item) => item.id === clip.id ? {
@@ -983,6 +989,7 @@ export function CueFaceStudio() {
           <Show when="signed-in">{experience}</Show>
         </>
       ) : workspace.step === 0 && !demoStarted ? <MarketingHome clerkEnabled={false} onStartDemo={startDemo} /> : experience}
+      <SupportWidget workspace={workspace} recentError={error} />
     </>
   );
 }
@@ -1295,6 +1302,7 @@ function CastStudio(props: CastStudioProps) {
 
   async function submitAsset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (workspace.mode === "demo" && assetKind === "video") return;
     const created = assetKind === "image"
       ? await props.onGenerateImage(imageDirection.trim())
       : await props.onGenerateVideo(motionPrompt.trim(), videoDuration);
@@ -1332,7 +1340,14 @@ function CastStudio(props: CastStudioProps) {
             {assetComposerOpen ? (
               <form className="asset-composer" onSubmit={submitAsset}>
                 <div className="asset-composer-head"><strong>New cast asset</strong><button type="button" aria-label="Close asset generator" onClick={() => setAssetComposerOpen(false)}><X size={13} /></button></div>
-                <div className="asset-kind-tabs"><button type="button" className={assetKind === "image" ? "is-active" : ""} onClick={() => setAssetKind("image")}><ImageIcon size={13} /> Image</button><button type="button" className={assetKind === "video" ? "is-active" : ""} onClick={() => setAssetKind("video")}><FileVideo size={13} /> Video</button></div>
+                <div className="asset-kind-tabs"><button type="button" className={assetKind === "image" ? "is-active" : ""} onClick={() => setAssetKind("image")}><ImageIcon size={13} /> Image</button><button type="button" className={assetKind === "video" ? "is-active" : ""} onClick={() => setAssetKind("video")} disabled={workspace.mode === "demo"}><FileVideo size={13} /> {workspace.mode === "demo" ? "Video · account" : "Video"}{workspace.mode === "demo" ? <LockKeyhole size={11} /> : null}</button></div>
+                {workspace.mode === "demo" ? (
+                  <div className="demo-video-lock">
+                    <LockKeyhole size={18} />
+                    <div><strong>Create AI video after signup</strong><span>The free demo includes the complete still-image reel. Create an account to receive video credits and save generated motion to your library.</span></div>
+                    {props.clerkEnabled ? <Show when="signed-out" fallback={<button type="button" className="button button--primary" onClick={props.onReset}>Open your studio</button>}><SignUpButton mode="modal"><button type="button" className="button button--primary">Create account</button></SignUpButton></Show> : null}
+                  </div>
+                ) : null}
                 {assetKind === "image" ? (
                   <label><span>PORTRAIT DIRECTION</span><textarea value={imageDirection} rows={5} onChange={(event) => setImageDirection(event.target.value)} /><small>Uses the approved cast portrait as the identity source. The prompt keeps the person alone and excludes product screenshots.</small></label>
                 ) : (
@@ -1365,7 +1380,13 @@ function CastStudio(props: CastStudioProps) {
                 <div className="asset-prompt-source"><span>IDENTITY SOURCE</span><strong>{activeReference?.label || "Approved cast portrait"}</strong></div>
               </div>
             ) : null}
-            <button className="motion-note" onClick={() => { setAssetKind("video"); setAssetComposerOpen(true); }}><Plus size={14} /><div><strong>Create reusable motion</strong><span>{videoAvailable ? `One AI video costs 1 video credit · ${creditsRemaining ?? "—"} remaining. Exports are included.` : "Connect OpenRouter later; your image workflow works now."}</span></div></button>
+            {workspace.mode === "demo" && props.clerkEnabled ? (
+              <Show when="signed-out" fallback={<button className="motion-note" onClick={props.onReset}><LockKeyhole size={14} /><div><strong>AI video needs an account</strong><span>Open your signed-in studio to use video credits and keep generated motion.</span></div></button>}>
+                <SignUpButton mode="modal"><button className="motion-note"><LockKeyhole size={14} /><div><strong>Create an account for AI video</strong><span>The still-image demo stays free. Sign up to receive video credits and save generated motion.</span></div></button></SignUpButton>
+              </Show>
+            ) : (
+              <button className="motion-note" onClick={() => { setAssetKind("video"); setAssetComposerOpen(true); }}><Plus size={14} /><div><strong>Create reusable motion</strong><span>{videoAvailable ? `Uses 1 video credit · ${creditsRemaining ?? "—"} remaining. Exports are included.` : "Connect OpenRouter later; your image workflow works now."}</span></div></button>
+            )}
           </section>
 
           <section className="cast-preview-stage">
@@ -1421,6 +1442,65 @@ function CastStudio(props: CastStudioProps) {
 
 function Notice({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return <div className="notice notice--error"><CircleAlert size={17} /><span>{message}</span><button onClick={onDismiss}><X size={15} /></button></div>;
+}
+
+function SupportWidget({ workspace, recentError }: { workspace: WorkspaceSnapshot; recentError: string }) {
+  const [open, setOpen] = useState(false);
+  const [category, setCategory] = useState<"bug" | "generation" | "account" | "question">(recentError ? "generation" : "question");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [website, setWebsite] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState("");
+  const [submitError, setSubmitError] = useState("");
+
+  async function submitSupport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setResult("");
+    setSubmitError("");
+    try {
+      const response = await apiRequest<{ ticketId: string }>("/api/support", {
+        email,
+        category,
+        message,
+        website,
+        projectId: workspace.clientProjectId || undefined,
+        productName: workspace.brief?.productName,
+        recentError: recentError || undefined,
+        pageUrl: window.location.href,
+        userAgent: navigator.userAgent,
+      });
+      setResult(`Ticket sent · ${response.ticketId}`);
+      setMessage("");
+    } catch (cause) {
+      setSubmitError(cause instanceof Error ? cause.message : "The ticket could not be sent. Try again shortly; your project remains saved.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className={`support-widget ${open ? "is-open" : ""}`}>
+      {open ? (
+        <section className="support-panel" role="dialog" aria-modal="false" aria-label="CueFace help and support">
+          <div className="support-panel-head"><div><span>HELP + SUPPORT</span><strong>What went wrong?</strong></div><button type="button" aria-label="Close help" onClick={() => setOpen(false)}><X size={16} /></button></div>
+          {result ? <div className="support-success"><Check size={16} /><div><strong>We’ve got it.</strong><span>{result}</span></div></div> : (
+            <form onSubmit={submitSupport}>
+              <label><span>Type</span><select value={category} onChange={(event) => setCategory(event.target.value as typeof category)}><option value="bug">Something is broken</option><option value="generation">Image or video failed</option><option value="account">Account or credits</option><option value="question">Question or feedback</option></select></label>
+              <label><span>Your email</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required /></label>
+              <label><span>What happened?</span><textarea rows={5} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Tell us what you tried, what you expected, and what happened." minLength={10} maxLength={2000} required /></label>
+              <label className="support-honeypot" aria-hidden="true"><span>Website</span><input value={website} onChange={(event) => setWebsite(event.target.value)} tabIndex={-1} autoComplete="off" /></label>
+              {recentError ? <p className="support-context"><CircleAlert size={13} /> The latest error and project details will be attached automatically.</p> : <p className="support-context">Project details are attached automatically so you do not need to copy technical information.</p>}
+              {submitError ? <p className="support-submit-error">{submitError}</p> : null}
+              <button className="button button--primary button--wide" disabled={submitting}>{submitting ? <LoaderCircle className="spin" size={15} /> : <Send size={15} />}{submitting ? "Sending…" : "Send support ticket"}</button>
+            </form>
+          )}
+        </section>
+      ) : null}
+      <button className="support-launcher" type="button" aria-label={open ? "Close help" : "Open help and support"} aria-expanded={open} onClick={() => { setOpen((value) => !value); setResult(""); }}><CircleHelp size={19} /><span>Help</span></button>
+    </div>
+  );
 }
 
 function StageHeader({ step, eyebrow, title, description }: { step: string; eyebrow: string; title: string; description: string }) {

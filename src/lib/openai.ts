@@ -3,12 +3,13 @@ import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
 import { assertPublicUrl } from "@/lib/url-safety";
 import { configuredImageInputFidelity } from "./openai-image-options";
+import { HttpError } from "./server-auth";
 
 let client: OpenAI | undefined;
 
 export function getOpenAI() {
   if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OpenAI is not configured for this environment.");
+    throw new HttpError("AI generation is temporarily unavailable.", 503, "Your project is safe. Try again later or send a support ticket.", "OPENAI_NOT_CONFIGURED");
   }
   client ??= new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   return client;
@@ -33,7 +34,7 @@ export async function parseStructured<T extends z.ZodType>(
   });
 
   if (!response.output_parsed) {
-    throw new Error("The model did not return a usable structured response.");
+    throw new HttpError("The AI returned an incomplete result.", 502, "Try the generation again. If it repeats, open Help and send a support ticket.", "INCOMPLETE_AI_RESULT");
   }
   return response.output_parsed as z.infer<T>;
 }
@@ -50,7 +51,7 @@ export async function generatePortrait(prompt: string) {
     output_compression: 78,
   });
   const encoded = response.data?.[0]?.b64_json;
-  if (!encoded) throw new Error("OpenAI returned no image data.");
+  if (!encoded) throw new HttpError("The AI returned an empty image.", 502, "Try generating the image again. If it repeats, open Help.", "EMPTY_IMAGE_RESULT");
   return `data:image/webp;base64,${encoded}`;
 }
 
@@ -64,11 +65,11 @@ export async function editPortrait(sourceDataUrl: string, prompt: string) {
   } else {
     const publicUrl = await assertPublicUrl(sourceDataUrl);
     const response = await fetch(publicUrl, { signal: AbortSignal.timeout(8_000) });
-    if (!response.ok) throw new Error("The stored source portrait could not be loaded.");
+    if (!response.ok) throw new HttpError("The source portrait could not be loaded.", 409, "Choose a ready cast image and try again.", "SOURCE_IMAGE_UNAVAILABLE");
     contentType = response.headers.get("content-type")?.split(";")[0] || "";
-    if (!contentType.startsWith("image/")) throw new Error("The stored source is not an image.");
+    if (!contentType.startsWith("image/")) throw new HttpError("The selected source is not an image.", 409, "Choose another cast image and try again.", "INVALID_SOURCE_IMAGE");
     const payload = await response.arrayBuffer();
-    if (payload.byteLength > 8_000_000) throw new Error("The source portrait is too large.");
+    if (payload.byteLength > 8_000_000) throw new HttpError("The source portrait is too large.", 400, "Choose a smaller cast image and try again.", "SOURCE_IMAGE_TOO_LARGE");
     bytes = Buffer.from(payload);
   }
   const extension = contentType.split("/")[1].replace("jpeg", "jpg");
@@ -87,6 +88,6 @@ export async function editPortrait(sourceDataUrl: string, prompt: string) {
     output_compression: 78,
   });
   const encoded = response.data?.[0]?.b64_json;
-  if (!encoded) throw new Error("OpenAI returned no edited image data.");
+  if (!encoded) throw new HttpError("The AI returned an empty edited image.", 502, "Try generating the image again. If it repeats, open Help.", "EMPTY_IMAGE_RESULT");
   return `data:image/webp;base64,${encoded}`;
 }

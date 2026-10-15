@@ -16,7 +16,9 @@ export async function GET(request: NextRequest) {
       publicationId,
       status: publication.status,
       instagramMediaId: publication.instagramMediaId,
-      error: publication.error,
+      error: publication.status === "failed"
+        ? "Instagram could not publish this reel.\n\nWhat you can do: Confirm the connected account is Professional, then retry. If it repeats, open Help and send a support ticket."
+        : undefined,
     });
   } catch (error) {
     return routeError(error);

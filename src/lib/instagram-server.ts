@@ -76,7 +76,16 @@ async function instagramFetch<T>(url: URL, init?: RequestInit): Promise<T> {
   } & T;
   if (!response.ok || payload.error) {
     const message = payload.error?.error_user_msg || payload.error?.message || `Instagram returned HTTP ${response.status}.`;
-    throw new HttpError(message, response.status >= 400 && response.status < 500 ? 400 : 502);
+    console.error("Instagram Graph API error", { status: response.status, code: payload.error?.code, message });
+    const publicMessage = payload.error?.error_user_msg || "Instagram rejected that request.";
+    throw new HttpError(
+      publicMessage,
+      response.status >= 400 && response.status < 500 ? 400 : 502,
+      response.status >= 500
+        ? "Instagram may be temporarily unavailable. Try again shortly."
+        : "Confirm the connected account is Professional and reconnect it if needed, then retry.",
+      "INSTAGRAM_API_ERROR",
+    );
   }
   return payload;
 }

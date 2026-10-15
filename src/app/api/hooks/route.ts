@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { hooksSchema } from "@/lib/schemas";
 import { parseStructured } from "@/lib/openai";
-import { requireGenerationAccess, routeError } from "@/lib/server-auth";
+import { HttpError, requireGenerationAccess, routeError } from "@/lib/server-auth";
 import { STORY_SYSTEM_PROMPT, storyBatchIssues } from "@/lib/story-standard";
 
 export const maxDuration = 60;
@@ -40,7 +40,12 @@ The prior draft violated the personal-story standard. Rewrite the complete batch
       );
       const remainingIssues = storyBatchIssues(result.hooks, brief.productName);
       if (remainingIssues.length) {
-        throw new Error("The writing model could not meet CueFace's personal-story standard. Please rewrite the batch.");
+        throw new HttpError(
+          "CueFace could not produce a usable personal-story batch.",
+          502,
+          "Choose Rewrite batch to try again. Your existing stories remain saved.",
+          "STORY_STANDARD_NOT_MET",
+        );
       }
     }
     return Response.json(result);

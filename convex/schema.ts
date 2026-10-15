@@ -113,4 +113,27 @@ export default defineSchema({
   })
     .index("by_owner", ["ownerTokenIdentifier"])
     .index("by_owner_and_publication_id", ["ownerTokenIdentifier", "publicationId"]),
+
+  supportTickets: defineTable({
+    ticketId: v.string(),
+    clerkUserId: v.optional(v.string()),
+    email: v.string(),
+    category: v.union(
+      v.literal("bug"),
+      v.literal("generation"),
+      v.literal("account"),
+      v.literal("question"),
+    ),
+    message: v.string(),
+    projectId: v.optional(v.string()),
+    productName: v.optional(v.string()),
+    recentError: v.optional(v.string()),
+    pageUrl: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    status: v.union(v.literal("open"), v.literal("resolved")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_ticket_id", ["ticketId"])
+    .index("by_status", ["status"]),
 });

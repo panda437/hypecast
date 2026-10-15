@@ -76,7 +76,10 @@ export function InstagramPublisher({ workspace, reel, onExport }: InstagramPubli
     setNotice("");
     try {
       const response = await fetch("/api/instagram/preferences", { method: "DELETE" });
-      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "Instagram could not be disconnected.");
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(`${payload.error || "Instagram could not be disconnected."}${payload.action ? `\n\nWhat you can do: ${payload.action}` : ""}`);
+      }
       await refresh();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Instagram could not be disconnected.");
