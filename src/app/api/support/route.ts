@@ -58,6 +58,15 @@ export async function POST(request: Request) {
 
     return Response.json({ ticketId }, { status: 201 });
   } catch (error) {
+    if (!(error instanceof HttpError) && !(error instanceof z.ZodError)) {
+      console.error("CueFace support ticket save failed", error);
+      return routeError(new HttpError(
+        "The support ticket could not be saved.",
+        503,
+        "Wait a moment and send it again. Your message stays on screen.",
+        "SUPPORT_SAVE_FAILED",
+      ));
+    }
     return routeError(error);
   }
 }
