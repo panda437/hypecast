@@ -51,6 +51,7 @@ import type {
 } from "@/lib/types";
 import { ReelPreview } from "@/components/reel-preview";
 import { CloudProjectSync } from "@/components/cloud-project-sync";
+import { ProjectDashboard } from "@/components/project-dashboard";
 
 const STORAGE_KEY = "cueface-project-v1";
 const PROJECTS_STORAGE_KEY = "cueface-project-history-v1";
@@ -192,6 +193,8 @@ function normalizeWorkspace(saved: WorkspaceSnapshot): WorkspaceSnapshot {
     ...emptyWorkspace,
     ...saved,
     clientProjectId: saved.clientProjectId || newId("project"),
+    productUrl: typeof saved.productUrl === "string" ? saved.productUrl : "",
+    creators: Array.isArray(saved.creators) ? saved.creators : [],
     references,
     clips,
     reels,
@@ -209,6 +212,7 @@ export function CueFaceStudio() {
   const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   const [workspace, setWorkspace] = useState<WorkspaceSnapshot>(emptyWorkspace);
   const [demoStarted, setDemoStarted] = useState(false);
+  const [showProjects, setShowProjects] = useState(true);
   const [hydrated, setHydrated] = useState(false);
   const [capabilities, setCapabilities] = useState<(AppCapabilities & { openrouter?: boolean }) | null>(null);
   const [videoPlan, setVideoPlan] = useState<VideoPlan | null>(null);
@@ -223,6 +227,7 @@ export function CueFaceStudio() {
   const [cloudSaveStatus, setCloudSaveStatus] = useState<SaveStatus>({ state: "idle", target: "cloud" });
   const [deviceProjects, setDeviceProjects] = useState<SavedProject[]>([]);
   const [cloudProjects, setCloudProjects] = useState<SavedProject[]>([]);
+  const [cloudProjectsReady, setCloudProjectsReady] = useState(false);
   const [pendingExports, setPendingExports] = useState<PendingExport[]>([]);
   const pendingVideoJobKey = useMemo(() => JSON.stringify(
     workspace.clips
@@ -441,7 +446,11 @@ export function CueFaceStudio() {
   }, []);
 
   const handleCloudProjects = useCallback((projects: SavedProject[]) => {
-    setCloudProjects(projects);
+    setCloudProjects(projects.map((project) => ({ ...project, snapshot: normalizeWorkspace(project.snapshot) })));
+  }, []);
+
+  const handleCloudProjectsReady = useCallback((ready: boolean) => {
+    setCloudProjectsReady(ready);
   }, []);
 
   const handleCloudSaveStatus = useCallback((status: SaveStatus) => {
@@ -452,12 +461,23 @@ export function CueFaceStudio() {
     const project = savedProjects.find((item) => item.clientProjectId === clientProjectId);
     if (!project) return;
     setDemoStarted(true);
+    setShowProjects(false);
     restoreWorkspace(project.snapshot);
   }
 
   function resetProject() {
+    if (clerkEnabled) {
+      setShowProjects(true);
+      setError("");
+      return;
+    }
+    startNewProject();
+  }
+
+  function startNewProject() {
     setWorkspace(newWorkspace(clerkEnabled ? "live" : "demo"));
     setDemoStarted(false);
+    setShowProjects(false);
     setSelectedReelId("");
     setSelectedAssetId("");
     setError("");
@@ -936,6 +956,7 @@ export function CueFaceStudio() {
       savedProjects={savedProjects}
       onDismissError={() => setError("")}
       onReset={resetProject}
+      onNewProject={startNewProject}
       onChangeCast={() => updateWorkspace({ step: 2 })}
       onOpenProject={openSavedProject}
       onSelectReel={chooseReel}
@@ -973,20 +994,21 @@ export function CueFaceStudio() {
       {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CONVEX_URL ? (
         <CloudProjectSync
           workspace={workspace}
+          workspaceOpen={!showProjects}
           hydrated={hydrated}
           pendingExports={pendingExports}
           onAssetStored={handleAssetStored}
           onClipStored={handleClipStored}
           onExportStored={handleExportStored}
-          onRestore={restoreWorkspace}
           onProjectsChanged={handleCloudProjects}
+          onProjectsReady={handleCloudProjectsReady}
           onSaveStatus={handleCloudSaveStatus}
         />
       ) : null}
       {clerkEnabled ? (
         <>
           <Show when="signed-out">{workspace.step === 0 && !demoStarted ? <MarketingHome clerkEnabled onStartDemo={startDemo} /> : experience}</Show>
-          <Show when="signed-in">{experience}</Show>
+          <Show when="signed-in">{showProjects ? <ProjectDashboard projects={savedProjects} loading={!cloudProjectsReady} onOpenProject={openSavedProject} onNewProject={startNewProject} /> : experience}</Show>
         </>
       ) : workspace.step === 0 && !demoStarted ? <MarketingHome clerkEnabled={false} onStartDemo={startDemo} /> : experience}
       <SupportWidget workspace={workspace} recentError={error} />
@@ -1140,6 +1162,7 @@ function CastOnboarding(props: OnboardingProps) {
         <button className="brand" onClick={props.onReset}><span className="brand-mark">C</span><span>CUEFACE</span></button>
         <div className="studio-topbar-title"><span>CREATOR ONBOARDING</span><strong>{workspace.brief?.productName || "New cast"}</strong></div>
         <div className="onboarding-top-actions">
+          {props.clerkEnabled ? <Show when="signed-in"><button type="button" className="studio-all-projects" onClick={props.onReset}><LayoutGrid size={14} /> All studios</button></Show> : null}
           {workspace.mode === "demo" ? <span className="status-pill"><span className="signal signal--live" /> Free demo · no credits</span> : null}
           {props.clerkEnabled ? <Show when="signed-in" fallback={<SignInButton mode="modal"><button className="button button--small"><LogIn size={14} /> Sign in</button></SignInButton>}><UserButton /></Show> : null}
         </div>
@@ -1255,6 +1278,7 @@ type CastStudioProps = {
   videoCredits: VideoCredits | null;
   onDismissError: () => void;
   onReset: () => void;
+  onNewProject: () => void;
   onChangeCast: () => void;
   onOpenProject: (clientProjectId: string) => void;
   onSelectReel: (id: string) => void;
@@ -1315,7 +1339,7 @@ function CastStudio(props: CastStudioProps) {
         <button className="brand" onClick={props.onReset}><span className="brand-mark">C</span><span>CUEFACE</span></button>
         <span className="cast-nav-label">WORKSPACE</span>
         <nav className="cast-nav"><a className="is-active" href="#cast-studio"><LayoutGrid size={16} /><span>Cast studio</span></a><a href="#cast-backgrounds"><Library size={16} /><span>Backgrounds</span><small>{workspace.clips.length}</small></a><a href="#cast-reels"><FileVideo size={16} /><span>Reels</span><small>{workspace.reels.length}</small></a></nav>
-        <div className="cast-sidebar-project"><span>ACTIVE PROJECT</span><strong>{workspace.brief?.productName}</strong><button onClick={props.onReset}>Start another product</button></div>
+        <div className="cast-sidebar-project"><span>ACTIVE PROJECT</span><strong>{workspace.brief?.productName}</strong><button onClick={props.onNewProject}>Start another product</button></div>
         {props.savedProjects.some((project) => project.clientProjectId !== workspace.clientProjectId && project.snapshot.step > 0) ? (
           <div className="saved-projects">
             <span>RECENT STUDIOS</span>
@@ -1330,7 +1354,7 @@ function CastStudio(props: CastStudioProps) {
       </aside>
 
       <main className="cast-main">
-        <header className="cast-topbar"><div><button className="studio-back-button" onClick={props.onChangeCast}><ArrowLeft size={14} /> Back to cast</button><span>CAST STUDIO / {creator.name.toUpperCase()}</span><h1>Make the next reel.</h1></div><div className="cast-topbar-actions">{props.videoCredits ? <div className="video-credit-balance"><FileVideo size={13} /><strong>{props.videoCredits.remaining}</strong><span>video credits</span></div> : null}{props.clerkEnabled ? <Show when="signed-in" fallback={<SaveBadge status={props.deviceSaveStatus} />}><SaveBadge status={props.cloudSaveStatus} /></Show> : <SaveBadge status={props.deviceSaveStatus} />}</div></header>
+        <header className="cast-topbar"><div><div className="cast-topbar-links">{props.clerkEnabled ? <Show when="signed-in"><button className="studio-back-button" onClick={props.onReset}><LayoutGrid size={14} /> All studios</button></Show> : null}<button className="studio-back-button" onClick={props.onChangeCast}><ArrowLeft size={14} /> Back to cast</button></div><span>CAST STUDIO / {creator.name.toUpperCase()}</span><h1>Make the next reel.</h1></div><div className="cast-topbar-actions">{props.videoCredits ? <div className="video-credit-balance"><FileVideo size={13} /><strong>{props.videoCredits.remaining}</strong><span>video credits</span></div> : null}{props.clerkEnabled ? <Show when="signed-in" fallback={<SaveBadge status={props.deviceSaveStatus} />}><SaveBadge status={props.cloudSaveStatus} /></Show> : <SaveBadge status={props.deviceSaveStatus} />}</div></header>
         {props.error ? <Notice message={props.error} onDismiss={props.onDismissError} /> : null}
         <div className="cast-workbench" id="cast-studio">
           <section className="cast-assets-panel" id="cast-backgrounds">

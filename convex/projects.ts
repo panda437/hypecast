@@ -15,7 +15,7 @@ export const listMine = query({
       .query("projects")
       .withIndex("by_owner", (q) => q.eq("ownerTokenIdentifier", identity.tokenIdentifier))
       .order("desc")
-      .take(20);
+      .collect();
   },
 });
 

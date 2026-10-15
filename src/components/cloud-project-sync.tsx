@@ -9,13 +9,14 @@ import type { PendingExport, SavedProject, SaveStatus, WorkspaceSnapshot } from 
 
 type CloudProjectSyncProps = {
   workspace: WorkspaceSnapshot;
+  workspaceOpen: boolean;
   hydrated: boolean;
   pendingExports: PendingExport[];
   onAssetStored: (kind: "candidate" | "reference", id: string, url: string) => void;
   onClipStored: (id: string, url: string) => void;
   onExportStored: (id: string, url: string) => void;
-  onRestore: (workspace: WorkspaceSnapshot) => void;
   onProjectsChanged: (projects: SavedProject[]) => void;
+  onProjectsReady: (ready: boolean) => void;
   onSaveStatus: (status: SaveStatus) => void;
 };
 
@@ -44,13 +45,14 @@ function isBlank(workspace: WorkspaceSnapshot) {
 
 export function CloudProjectSync({
   workspace,
+  workspaceOpen,
   hydrated,
   pendingExports,
   onAssetStored,
   onClipStored,
   onExportStored,
-  onRestore,
   onProjectsChanged,
+  onProjectsReady,
   onSaveStatus,
 }: CloudProjectSyncProps) {
   const { isSignedIn } = useAuth();
@@ -61,22 +63,21 @@ export function CloudProjectSync({
   const [projectId, setProjectId] = useState<Id<"projects"> | null>(null);
   const [projectClientId, setProjectClientId] = useState("");
   const [ready, setReady] = useState(false);
-  const initialized = useRef(false);
   const uploading = useRef(new Set<string>());
   const saveSequence = useRef(0);
 
   useEffect(() => {
     if (isSignedIn) return;
-    initialized.current = false;
     const timer = window.setTimeout(() => {
       setProjectId(null);
       setProjectClientId("");
       setReady(false);
       onProjectsChanged([]);
+      onProjectsReady(false);
       onSaveStatus({ state: "idle", target: "cloud" });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [isSignedIn, onProjectsChanged, onSaveStatus]);
+  }, [isSignedIn, onProjectsChanged, onProjectsReady, onSaveStatus]);
 
   useEffect(() => {
     if (!isSignedIn || !hydrated || projects === undefined) return;
@@ -95,46 +96,23 @@ export function CloudProjectSync({
         source: "cloud" as const,
       }));
     onProjectsChanged(savedProjects);
-
-    if (initialized.current) {
-      const active = projects.find((project) => project.clientProjectId === workspace.clientProjectId);
-      const timer = window.setTimeout(() => {
-        setProjectId(active?._id || null);
-        setProjectClientId(workspace.clientProjectId);
-      }, 0);
-      return () => window.clearTimeout(timer);
-    }
-
-    initialized.current = true;
+    onProjectsReady(true);
+    if (!workspaceOpen) return;
     const matching = projects.find((project) => project.clientProjectId === workspace.clientProjectId);
-    const latest = projects[0];
-    const shouldRestoreMatching = matching && matching.updatedAt > workspace.updatedAt;
-    const restore = shouldRestoreMatching ? matching : isBlank(workspace) ? latest : undefined;
-
-    if (restore?.snapshot && typeof restore.snapshot === "object") {
-      const timer = window.setTimeout(() => {
-        setProjectId(restore._id);
-        setProjectClientId(restore.clientProjectId);
-        onRestore({
-          ...(restore.snapshot as WorkspaceSnapshot),
-          clientProjectId: restore.clientProjectId,
-          updatedAt: restore.updatedAt,
-        });
-        setReady(true);
-      }, 0);
-      return () => window.clearTimeout(timer);
-    }
-
     const timer = window.setTimeout(() => {
       setProjectId(matching?._id || null);
       setProjectClientId(workspace.clientProjectId);
       setReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [hydrated, isSignedIn, onProjectsChanged, onRestore, projects, workspace]);
+  }, [hydrated, isSignedIn, onProjectsChanged, onProjectsReady, projects, workspace.clientProjectId, workspaceOpen]);
 
   useEffect(() => {
-    if (!ready || !isSignedIn || !workspace.clientProjectId || projectClientId !== workspace.clientProjectId) return;
+    saveSequence.current += 1;
+  }, [workspace.clientProjectId]);
+
+  useEffect(() => {
+    if (!ready || !isSignedIn || isBlank(workspace) || !workspace.clientProjectId || projectClientId !== workspace.clientProjectId) return;
     const sequence = ++saveSequence.current;
     onSaveStatus({ state: "saving", target: "cloud" });
     const timer = window.setTimeout(async () => {
@@ -146,8 +124,10 @@ export function CloudProjectSync({
           stage: workspace.step,
           snapshot: withoutInlineMedia(workspace),
         });
-        setProjectId(id);
-        if (sequence === saveSequence.current) onSaveStatus({ state: "saved", target: "cloud", savedAt: Date.now() });
+        if (sequence === saveSequence.current) {
+          setProjectId(id);
+          onSaveStatus({ state: "saved", target: "cloud", savedAt: Date.now() });
+        }
       } catch (cause) {
         if (sequence === saveSequence.current) {
           onSaveStatus({ state: "error", target: "cloud", message: cause instanceof Error ? cause.message : "Cloud save failed" });
